@@ -1,0 +1,16 @@
+{
+  "_note": "Backup of .claude/settings.json hooks block, disabled on 2026-04-10 during GSD Phase 1 execution because the auto-save PostToolUse hook was interfering with GSD atomic commits and worktree merges. To re-enable, copy the `hooks` block below back into .claude/settings.json.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null)\" && git add -A && git diff --cached --quiet || git commit -m \"auto: save progress $(date +\"%Y-%m-%d %H:%M\")\" --no-verify 2>/dev/null || true'"
+          }
+        ]
+      }
+    ]
+  }
+}
