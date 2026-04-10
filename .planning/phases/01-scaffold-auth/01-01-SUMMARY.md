@@ -175,9 +175,16 @@ None — all env values in `.env.example` are empty templates. Developers (and l
 
 **No blockers.**
 
-## Self-Check: PENDING
+## Self-Check: PASSED
 
-(Self-check block appended below after initial write.)
+All claimed files verified present on disk:
+- package.json, pnpm-workspace.yaml, tsconfig.base.json, .nvmrc, .gitignore, .env.example, README.md
+- extension/.gitkeep, backend/.gitkeep, demo-data/.gitkeep, docs/.gitkeep
+- .planning/phases/01-scaffold-auth/01-01-SUMMARY.md
+
+All claimed commits verified in git history:
+- `0518df7` — feat(01-01): scaffold pnpm monorepo workspace directories
+- `df7442e` — chore(01-01): verify .env.example contract (no-op)
 
 ---
 *Phase: 01-scaffold-auth*
