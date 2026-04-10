@@ -33,10 +33,10 @@
 **Architecture decision owned here**: choose the TypeScript backend framework and hosting target. Spec says "choose the best framework and hosting for the job" — log the decision in PROJECT.md Key Decisions before leaving Phase 1.
 
 **Plans**: 4 plans
-- [ ] 01-01-PLAN.md — Monorepo foundation (pnpm workspaces, shared tsconfig, .env.example, .gitignore)
-- [ ] 01-02-PLAN.md — Fastify backend skeleton + /health endpoint + CORS + env loader
-- [ ] 01-03-PLAN.md — Vite + React + TS extension app + stub .trex manifest
-- [ ] 01-04-PLAN.md — Tableau PAT auth + token cache + tableauFetch 401-retry + architecture decision log
+- [x] 01-01-PLAN.md — Monorepo foundation (pnpm workspaces, shared tsconfig, .env.example, .gitignore)
+- [x] 01-02-PLAN.md — Fastify backend skeleton + /health endpoint + CORS + env loader
+- [x] 01-03-PLAN.md — Vite + React + TS extension app + stub .trex manifest
+- [x] 01-04-PLAN.md — Tableau PAT auth + token cache + tableauFetch 401-retry + architecture decision log
 **UI hint**: no
 
 ---
