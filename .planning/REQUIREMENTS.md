@@ -9,13 +9,13 @@ Requirements for the initial demo release. All map directly to the 5 phases defi
 
 ### Scaffold
 
-- [ ] **SCAF-01**: Developer can run a TypeScript monorepo with workspaces for `extension/`, `backend/`, `demo-data/`, and `docs/`
-- [ ] **SCAF-02**: Developer can run the Vite + React + TypeScript extension app locally
-- [ ] **SCAF-03**: Developer can start the TypeScript backend and `GET /health` returns HTTP 200
-- [ ] **SCAF-04**: Backend exposes `.env.example` declaring all required vars (`TABLEAU_SERVER_URL`, `TABLEAU_SITE_NAME`, `TABLEAU_PAT_NAME`, `TABLEAU_PAT_SECRET`, `ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`, `PORT`, `EXTENSION_ORIGIN`)
+- [x] **SCAF-01**: Developer can run a TypeScript monorepo with workspaces for `extension/`, `backend/`, `demo-data/`, and `docs/`
+- [x] **SCAF-02**: Developer can run the Vite + React + TypeScript extension app locally
+- [x] **SCAF-03**: Developer can start the TypeScript backend and `GET /health` returns HTTP 200
+- [x] **SCAF-04**: Backend exposes `.env.example` declaring all required vars (`TABLEAU_SERVER_URL`, `TABLEAU_SITE_NAME`, `TABLEAU_PAT_NAME`, `TABLEAU_PAT_SECRET`, `ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`, `PORT`, `EXTENSION_ORIGIN`)
 - [x] **SCAF-05**: Backend authenticates against Tableau Cloud REST API with PAT and returns a valid `X-Tableau-Auth` token
 - [x] **SCAF-06**: Backend caches the Tableau token and auto-refreshes on any 401 from a downstream Tableau API
-- [ ] **SCAF-07**: Repo contains a stub `.trex` manifest file that declares the extension
+- [x] **SCAF-07**: Repo contains a stub `.trex` manifest file that declares the extension
 
 ### Tableau Services
 
@@ -111,13 +111,13 @@ Populated during roadmap creation. Each requirement maps to exactly one phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCAF-01 | Phase 1 | Pending |
-| SCAF-02 | Phase 1 | Pending |
-| SCAF-03 | Phase 1 | Pending |
-| SCAF-04 | Phase 1 | Pending |
+| SCAF-01 | Phase 1 | Complete |
+| SCAF-02 | Phase 1 | Complete |
+| SCAF-03 | Phase 1 | Complete |
+| SCAF-04 | Phase 1 | Complete |
 | SCAF-05 | Phase 1 | Complete |
 | SCAF-06 | Phase 1 | Complete |
-| SCAF-07 | Phase 1 | Pending |
+| SCAF-07 | Phase 1 | Complete |
 | TAPI-01 | Phase 2 | Pending |
 | TAPI-02 | Phase 2 | Pending |
 | TAPI-03 | Phase 2 | Pending |
