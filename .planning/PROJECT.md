@@ -88,6 +88,8 @@ A Tableau user sees streamed, schema-aware narrative intelligence (with anomaly 
 | Auto-refresh Tableau PAT on 401 rather than timer-based refresh | 4-hour expiry is reliable but reactive refresh is simpler and safer | — Pending |
 | `interpretFieldCaptionsAsFieldNames: true` on every VizQL request | Ensures Claude sees the same field names users see in the UI | — Pending |
 | Context truncation priority: schema > pulse > data rows | Schema + existing AI insights are denser signal than raw rows | — Pending |
+| **Backend framework: Fastify 5.x** (Phase 1, 2026-04-10) | TypeScript-first, pino logger built in, best-in-class SSE support for Phase 3 `/chat` streaming, rich plugin ecosystem (`@fastify/cors`, future SSE plugins), minimal boilerplate. Alternatives considered: Hono (newer, less battle-tested for our SSE streaming needs), Express (slower, no first-class TS, manual pino wiring). Installed in Plan 01-02; decision logged in Plan 01-04 per ROADMAP Phase 1 requirement and CLAUDE.md "Own all architecture decisions". | Locked — Phase 1 |
+| **Backend hosting target: Fly.io** (Phase 1, 2026-04-10) | Supports long-lived SSE connections (critical for Phase 3 `/chat` streaming), public HTTPS + custom domains out of the box (Tableau Extension requirement), Node 20 runtime, first-class Docker support, generous free tier, simple `fly launch` / `fly deploy` workflow. Alternatives considered: Render (SSE connection limits on free tier), Railway (pricing unclear at scale), Vercel (serverless function 10s timeout incompatible with long-lived SSE streaming). Actual deployment happens in Phase 5; Phase 1 just locks the target so Phase 2/3 can design with it in mind. | Locked — Phase 1 |
 
 ## Evolution
 
