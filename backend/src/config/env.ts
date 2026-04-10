@@ -1,4 +1,28 @@
-import 'dotenv/config';
+import { config as dotenvConfig } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+// Resolve .env from the nearest ancestor directory that contains it, starting
+// from this module's location. This keeps the loader robust whether the
+// developer runs `pnpm --filter @aperture/backend dev` from the monorepo root
+// or `pnpm dev` from inside `backend/` — the .env file lives at the workspace
+// root per the Plan 01-01 contract, not inside each package.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+function findEnvFile(): string | undefined {
+  let dir = __dirname;
+  for (let i = 0; i < 6; i++) {
+    const candidate = resolve(dir, '.env');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
+}
+const envPath = findEnvFile();
+dotenvConfig(envPath ? { path: envPath } : undefined);
 
 export interface TableauEnv {
   serverUrl: string;
