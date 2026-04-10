@@ -1,0 +1,19 @@
+{
+  "name": "aperture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tableau Cloud Extension that embeds an AI analytics co-pilot",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "scripts": {
+    "dev:backend": "pnpm --filter @aperture/backend dev",
+    "dev:extension": "pnpm --filter @aperture/extension dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
