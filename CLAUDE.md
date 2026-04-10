@@ -87,9 +87,7 @@ Architecture not yet mapped. Follow existing patterns found in the codebase.
 <!-- GSD:architecture-end -->
 
 <!-- GSD:skills-start source:skills/ -->
-## Project Skills
-
-No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, or `.github/skills/` with a `SKILL.md` index file.
+<!-- Project skills are defined in the "Skills" section above (/ui-ux-pro-max for extension/ work). -->
 <!-- GSD:skills-end -->
 
 <!-- GSD:workflow-start source:GSD defaults -->
