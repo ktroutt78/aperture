@@ -1,0 +1,233 @@
+-- =============================================================================
+-- Aperture Energy Intelligence — DDL
+-- Database: APERTURE_DB  |  Schema: ENERGY
+-- Run as: SYSADMIN
+-- =============================================================================
+
+USE ROLE SYSADMIN;
+USE WAREHOUSE COMPUTE_WH;
+
+-- ---- Database & Schema ----
+CREATE DATABASE IF NOT EXISTS APERTURE_DB
+  COMMENT = 'Energy intelligence dataset for Aperture Tableau Extension';
+
+CREATE SCHEMA IF NOT EXISTS APERTURE_DB.ENERGY
+  COMMENT = 'Multi-source energy intelligence data for Tableau dashboards';
+
+-- ---- Dimension Tables ----
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.DIM_PADD_REGIONS (
+    PADD_ID          SMALLINT     NOT NULL PRIMARY KEY,
+    PADD_CODE        VARCHAR(10)  NOT NULL,
+    PADD_NAME        VARCHAR(100) NOT NULL,
+    PADD_DESCRIPTION VARCHAR(500),
+    CENTROID_LAT     FLOAT,
+    CENTROID_LON     FLOAT,
+    STATES_INCLUDED  VARCHAR(1000),
+    COMMENT          VARCHAR(500)
+) COMMENT = 'PADD district reference with centroid coordinates for Tableau map plotting';
+
+INSERT INTO APERTURE_DB.ENERGY.DIM_PADD_REGIONS VALUES
+(0, 'US',    'United States Total', 'All US PADD districts combined', 39.8283, -98.5795, 'All states', 'Aggregate row'),
+(1, 'PADD1', 'East Coast',         'CT, ME, MA, NH, RI, VT, DE, DC, FL, GA, MD, NJ, NY, NC, PA, SC, VA, WV', 38.0, -77.0, 'CT,ME,MA,NH,RI,VT,DE,DC,FL,GA,MD,NJ,NY,NC,PA,SC,VA,WV', 'Largest consumer district'),
+(2, 'PADD2', 'Midwest',            'IL, IN, IA, KS, KY, MI, MN, MO, NE, ND, SD, OH, OK, TN, WI', 41.0, -89.0, 'IL,IN,IA,KS,KY,MI,MN,MO,NE,ND,SD,OH,OK,TN,WI', 'Major refining hub'),
+(3, 'PADD3', 'Gulf Coast',         'AL, AR, LA, MS, NM, TX', 30.5, -92.0, 'AL,AR,LA,MS,NM,TX', 'Largest refining capacity'),
+(4, 'PADD4', 'Rocky Mountain',     'CO, ID, MT, UT, WY', 43.0, -109.0, 'CO,ID,MT,UT,WY', 'Smallest district by volume'),
+(5, 'PADD5', 'West Coast',         'AK, AZ, CA, HI, NV, OR, WA', 37.5, -120.0, 'AK,AZ,CA,HI,NV,OR,WA', 'Includes Alaska production');
+
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.DIM_NOAA_STATION_PADD_MAP (
+    STATE_FIPS      VARCHAR(2)   NOT NULL,
+    STATE_ABBR      VARCHAR(2)   NOT NULL,
+    STATE_NAME      VARCHAR(50)  NOT NULL,
+    PADD_ID         SMALLINT     NOT NULL REFERENCES APERTURE_DB.ENERGY.DIM_PADD_REGIONS(PADD_ID),
+    NOAA_STATION_ID VARCHAR(20),
+    STATION_NAME    VARCHAR(100),
+    STATION_LAT     FLOAT,
+    STATION_LON     FLOAT
+) COMMENT = 'Maps US states (and representative NOAA weather stations) to PADD regions';
+
+-- 51 rows: all US states + DC mapped to PADD with representative NOAA stations
+INSERT INTO APERTURE_DB.ENERGY.DIM_NOAA_STATION_PADD_MAP
+(STATE_FIPS, STATE_ABBR, STATE_NAME, PADD_ID, NOAA_STATION_ID, STATION_NAME, STATION_LAT, STATION_LON) VALUES
+('09','CT','Connecticut',1,'USW00014740','HARTFORD BRADLEY INTL AP',41.938,-72.683),
+('23','ME','Maine',1,'USW00014764','PORTLAND INTL JETPORT',43.642,-70.304),
+('25','MA','Massachusetts',1,'USW00014739','BOSTON LOGAN INTL AP',42.361,-71.010),
+('33','NH','New Hampshire',1,'USW00014745','CONCORD MUNICIPAL AP',43.202,-71.502),
+('44','RI','Rhode Island',1,'USW00014765','PROVIDENCE T F GREEN AP',41.724,-71.428),
+('50','VT','Vermont',1,'USW00014742','BURLINGTON INTL AP',44.468,-73.150),
+('10','DE','Delaware',1,'USW00013781','WILMINGTON NEW CASTLE CO AP',39.672,-75.606),
+('11','DC','District of Columbia',1,'USW00013743','WASHINGTON REAGAN AP',38.851,-77.034),
+('12','FL','Florida',1,'USW00012839','MIAMI INTL AP',25.791,-80.316),
+('13','GA','Georgia',1,'USW00013874','ATLANTA HARTSFIELD AP',33.630,-84.442),
+('24','MD','Maryland',1,'USW00093721','BALTIMORE WASH INTL AP',39.173,-76.684),
+('34','NJ','New Jersey',1,'USW00014734','NEWARK LIBERTY INTL AP',40.683,-74.169),
+('36','NY','New York',1,'USW00094728','NEW YORK JFK INTL AP',40.640,-73.762),
+('37','NC','North Carolina',1,'USW00013722','RALEIGH DURHAM INTL AP',35.878,-78.788),
+('42','PA','Pennsylvania',1,'USW00014737','PHILADELPHIA INTL AP',39.872,-75.241),
+('45','SC','South Carolina',1,'USW00013880','CHARLESTON INTL AP',32.899,-80.040),
+('51','VA','Virginia',1,'USW00013740','RICHMOND INTL AP',37.505,-77.320),
+('54','WV','West Virginia',1,'USW00013866','CHARLESTON YEAGER AP',38.373,-81.593),
+('17','IL','Illinois',2,'USW00094846','CHICAGO OHARE INTL AP',41.995,-87.934),
+('18','IN','Indiana',2,'USW00093819','INDIANAPOLIS INTL AP',39.717,-86.294),
+('19','IA','Iowa',2,'USW00014933','DES MOINES INTL AP',41.534,-93.663),
+('20','KS','Kansas',2,'USW00013996','WICHITA MID CONTINENT AP',37.650,-97.433),
+('21','KY','Kentucky',2,'USW00093821','LOUISVILLE STANDIFORD FLD',38.174,-85.736),
+('26','MI','Michigan',2,'USW00094847','DETROIT METRO AP',42.212,-83.349),
+('27','MN','Minnesota',2,'USW00014922','MINNEAPOLIS ST PAUL AP',44.883,-93.229),
+('29','MO','Missouri',2,'USW00013994','ST LOUIS LAMBERT INTL AP',38.753,-90.374),
+('31','NE','Nebraska',2,'USW00014942','OMAHA EPPLEY AIRFIELD',41.320,-95.894),
+('38','ND','North Dakota',2,'USW00014914','FARGO HECTOR INTL AP',46.927,-96.808),
+('46','SD','South Dakota',2,'USW00014944','SIOUX FALLS FOSS FLD',43.582,-96.742),
+('39','OH','Ohio',2,'USW00014820','COLUMBUS PORT COLUMBUS',40.000,-82.883),
+('40','OK','Oklahoma',2,'USW00013967','OKLAHOMA CITY WILL ROGERS',35.389,-97.601),
+('47','TN','Tennessee',2,'USW00013893','NASHVILLE INTL AP',36.119,-86.689),
+('55','WI','Wisconsin',2,'USW00014839','MILWAUKEE MITCHELL INTL',42.955,-87.905),
+('01','AL','Alabama',3,'USW00013876','BIRMINGHAM AP',33.566,-86.745),
+('05','AR','Arkansas',3,'USW00013963','LITTLE ROCK ADAMS FLD',34.732,-92.244),
+('22','LA','Louisiana',3,'USW00012916','NEW ORLEANS INTL AP',29.981,-90.250),
+('28','MS','Mississippi',3,'USW00013865','JACKSON INTL AP',32.321,-90.076),
+('35','NM','New Mexico',3,'USW00023050','ALBUQUERQUE INTL AP',35.042,-106.616),
+('48','TX','Texas',3,'USW00012960','HOUSTON INTERCONTINENTAL',29.980,-95.360),
+('08','CO','Colorado',4,'USW00023062','DENVER INTL AP',39.833,-104.658),
+('16','ID','Idaho',4,'USW00024131','BOISE AIR TERMINAL',43.567,-116.241),
+('30','MT','Montana',4,'USW00024033','GREAT FALLS INTL AP',47.482,-111.370),
+('49','UT','Utah',4,'USW00024127','SALT LAKE CITY INTL AP',40.778,-111.969),
+('56','WY','Wyoming',4,'USW00024018','CHEYENNE MUNICIPAL AP',41.156,-104.819),
+('02','AK','Alaska',5,'USW00026451','ANCHORAGE INTL AP',61.174,-150.027),
+('04','AZ','Arizona',5,'USW00023183','PHOENIX SKY HARBOR AP',33.428,-112.004),
+('06','CA','California',5,'USW00023174','LOS ANGELES INTL AP',33.938,-118.389),
+('15','HI','Hawaii',5,'USW00022521','HONOLULU INTL AP',21.324,-157.929),
+('32','NV','Nevada',5,'USW00023169','LAS VEGAS MCCARRAN AP',36.072,-115.163),
+('41','OR','Oregon',5,'USW00024229','PORTLAND INTL AP',45.596,-122.609),
+('53','WA','Washington',5,'USW00024233','SEATTLE TACOMA INTL AP',47.445,-122.314);
+
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.DIM_GDELT_COUNTRY_PADD_MAP (
+    COUNTRY_CODE        VARCHAR(3)   NOT NULL,
+    COUNTRY_NAME        VARCHAR(100) NOT NULL,
+    ENERGY_RELEVANCE    VARCHAR(50)  NOT NULL,
+    PRIMARY_PADD_IMPACT SMALLINT     REFERENCES APERTURE_DB.ENERGY.DIM_PADD_REGIONS(PADD_ID),
+    DESCRIPTION         VARCHAR(500)
+) COMMENT = 'Maps energy-relevant countries to PADD regions most affected by their geopolitical events';
+
+INSERT INTO APERTURE_DB.ENERGY.DIM_GDELT_COUNTRY_PADD_MAP VALUES
+('SAU','Saudi Arabia','OPEC Producer',3,'Largest OPEC producer, Gulf Coast imports'),
+('RUS','Russia','Major Producer',1,'Major supplier to European market, affects East Coast imports'),
+('IRN','Iran','OPEC Producer',3,'Persian Gulf, sanctions affect global supply'),
+('IRQ','Iraq','OPEC Producer',3,'Persian Gulf producer'),
+('VEN','Venezuela','OPEC Producer',3,'Gulf Coast heavy crude supplier'),
+('NGA','Nigeria','OPEC Producer',1,'East Coast light crude supplier'),
+('LBY','Libya','OPEC Producer',1,'Mediterranean producer, East Coast impact'),
+('ARE','United Arab Emirates','OPEC Producer',3,'Persian Gulf producer'),
+('KWT','Kuwait','OPEC Producer',3,'Persian Gulf producer'),
+('CAN','Canada','Major Producer',2,'Midwest pipeline imports (Keystone)'),
+('MEX','Mexico','Major Producer',3,'Gulf Coast supplier'),
+('BRA','Brazil','Major Producer',3,'Gulf Coast supplier'),
+('NOR','Norway','Major Producer',1,'North Sea, East Coast impact'),
+('CHN','China','Major Consumer',5,'West Coast trade competition'),
+('IND','India','Major Consumer',0,'Global demand pressure'),
+('UKR','Ukraine','Transit Country',1,'Energy transit, European supply disruption'),
+('YEM','Yemen','Chokepoint',3,'Red Sea / Bab el-Mandeb strait'),
+('EGY','Egypt','Chokepoint',1,'Suez Canal transit'),
+('TUR','Turkey','Transit Country',1,'Bosphorus strait, pipeline hub'),
+('AGO','Angola','OPEC Producer',3,'Gulf Coast heavy crude');
+
+-- ---- Fact Tables ----
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.FACT_EIA_PRICES (
+    PRICE_DATE   DATE         NOT NULL,
+    SERIES_ID    VARCHAR(50)  NOT NULL,
+    PRODUCT_NAME VARCHAR(100) NOT NULL,
+    PRICE_USD    FLOAT,
+    PRICE_UNIT   VARCHAR(50)  DEFAULT 'USD/barrel',
+    PADD_ID      SMALLINT     DEFAULT 0,
+    LOADED_AT    TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    CONSTRAINT PK_EIA_PRICES PRIMARY KEY (PRICE_DATE, SERIES_ID)
+) COMMENT = 'Daily petroleum spot prices from EIA API (WTI, Brent, etc.)';
+
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.FACT_EIA_INVENTORY (
+    REPORT_DATE                     DATE         NOT NULL,
+    SERIES_ID                       VARCHAR(50)  NOT NULL,
+    PRODUCT_NAME                    VARCHAR(100) NOT NULL,
+    PADD_ID                         SMALLINT     NOT NULL,
+    INVENTORY_THOUSAND_BARRELS      FLOAT,
+    WEEKLY_CHANGE_THOUSAND_BARRELS  FLOAT,
+    LOADED_AT                       TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    CONSTRAINT PK_EIA_INVENTORY PRIMARY KEY (REPORT_DATE, SERIES_ID, PADD_ID)
+) COMMENT = 'Weekly petroleum inventory levels by PADD region from EIA API';
+
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.FACT_NOAA_WEATHER (
+    OBSERVATION_DATE    DATE         NOT NULL,
+    PADD_ID             SMALLINT     NOT NULL,
+    AVG_TEMP_F          FLOAT,
+    MIN_TEMP_F          FLOAT,
+    MAX_TEMP_F          FLOAT,
+    HEATING_DEGREE_DAYS FLOAT,
+    COOLING_DEGREE_DAYS FLOAT,
+    STATION_COUNT       INTEGER,
+    LOADED_AT           TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    CONSTRAINT PK_NOAA_WEATHER PRIMARY KEY (OBSERVATION_DATE, PADD_ID)
+) COMMENT = 'Daily temperature and degree days aggregated by PADD region from NOAA CDO API';
+
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.FACT_GDELT_EVENTS (
+    EVENT_DATE                 DATE         NOT NULL,
+    COUNTRY_CODE               VARCHAR(3)   NOT NULL,
+    COUNTRY_NAME               VARCHAR(100),
+    AVG_TONE                   FLOAT,
+    AVG_GOLDSTEIN_SCALE        FLOAT,
+    EVENT_COUNT                INTEGER,
+    CONFLICT_EVENT_COUNT       INTEGER,
+    COOPERATION_EVENT_COUNT    INTEGER,
+    GEOPOLITICAL_TENSION_SCORE FLOAT,
+    PRIMARY_PADD_IMPACT        SMALLINT,
+    LOADED_AT                  TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    CONSTRAINT PK_GDELT_EVENTS PRIMARY KEY (EVENT_DATE, COUNTRY_CODE)
+) COMMENT = 'Weekly geopolitical event scores for energy-relevant countries from GDELT Project';
+
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.FACT_EIA_STEO_FORECASTS (
+    FORECAST_MONTH   DATE         NOT NULL,
+    SERIES_ID        VARCHAR(50)  NOT NULL,
+    METRIC_NAME      VARCHAR(100) NOT NULL,
+    FORECAST_VALUE   FLOAT,
+    FORECAST_UNIT    VARCHAR(50),
+    PUBLICATION_DATE DATE,
+    LOADED_AT        TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    CONSTRAINT PK_EIA_STEO PRIMARY KEY (FORECAST_MONTH, SERIES_ID)
+) COMMENT = 'Monthly EIA Short Term Energy Outlook forecasts for price and production';
+
+CREATE OR REPLACE TABLE APERTURE_DB.ENERGY.PIPELINE_LOG (
+    LOG_ID          NUMBER AUTOINCREMENT,
+    LOG_TIMESTAMP   TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    SOURCE_NAME     VARCHAR(50)  NOT NULL,
+    PROCEDURE_NAME  VARCHAR(100) NOT NULL,
+    STATUS          VARCHAR(20)  NOT NULL,
+    ROWS_AFFECTED   INTEGER,
+    MESSAGE         VARCHAR(4000),
+    ERROR_DETAIL    VARCHAR(4000)
+) COMMENT = 'Audit log for data pipeline runs — tracks success, failures, and row counts';
+
+-- ---- Network Rule & External Access Integration ----
+CREATE OR REPLACE NETWORK RULE APERTURE_DB.ENERGY.APERTURE_API_NETWORK_RULE
+  MODE = EGRESS
+  TYPE = HOST_PORT
+  VALUE_LIST = ('api.eia.gov', 'www.ncei.noaa.gov', 'api.gdeltproject.org')
+  COMMENT = 'Allow outbound HTTPS to EIA, NOAA CDO, and GDELT APIs';
+
+CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION APERTURE_API_ACCESS
+  ALLOWED_NETWORK_RULES = (APERTURE_DB.ENERGY.APERTURE_API_NETWORK_RULE)
+  ENABLED = TRUE
+  COMMENT = 'External access for Aperture energy data pipeline API calls';
+
+-- ---- Role Grants ----
+-- TABLEAU_READER_ROLE (pre-existing) — read-only Tableau Cloud access
+GRANT USAGE ON DATABASE APERTURE_DB TO ROLE TABLEAU_READER_ROLE;
+GRANT USAGE ON SCHEMA APERTURE_DB.ENERGY TO ROLE TABLEAU_READER_ROLE;
+GRANT SELECT ON ALL TABLES IN SCHEMA APERTURE_DB.ENERGY TO ROLE TABLEAU_READER_ROLE;
+GRANT SELECT ON ALL VIEWS IN SCHEMA APERTURE_DB.ENERGY TO ROLE TABLEAU_READER_ROLE;
+GRANT SELECT ON FUTURE TABLES IN SCHEMA APERTURE_DB.ENERGY TO ROLE TABLEAU_READER_ROLE;
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA APERTURE_DB.ENERGY TO ROLE TABLEAU_READER_ROLE;
+GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE TABLEAU_READER_ROLE;
+
+-- ANALYTICS_ROLE — full access for pipeline execution
+GRANT USAGE ON DATABASE APERTURE_DB TO ROLE ANALYTICS_ROLE;
+GRANT ALL ON SCHEMA APERTURE_DB.ENERGY TO ROLE ANALYTICS_ROLE;
+GRANT ALL ON ALL TABLES IN SCHEMA APERTURE_DB.ENERGY TO ROLE ANALYTICS_ROLE;
+GRANT ALL ON FUTURE TABLES IN SCHEMA APERTURE_DB.ENERGY TO ROLE ANALYTICS_ROLE;
+GRANT ALL ON FUTURE VIEWS IN SCHEMA APERTURE_DB.ENERGY TO ROLE ANALYTICS_ROLE;
