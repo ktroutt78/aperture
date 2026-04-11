@@ -37,7 +37,11 @@ layout, or interaction. Every visual element in the co-pilot panel goes through 
 - PAT tokens expire after 4 hours — auto-refresh on 401
 - All three APIs (Metadata, VizQL Data Service, Pulse) share the same `X-Tableau-Auth` token
 - VizQL Data Service requires `API Access` permission enabled per datasource in Tableau Cloud
-- Set `interpretFieldCaptionsAsFieldNames: true` on all VizQL requests
+- VizQL Data Service matches field captions natively when fields are specified using the
+  `fieldCaption` key in the field spec — there is NO request-level toggle. (An earlier
+  draft of this file mentioned an `interpretFieldCaptionsAsFieldNames: true` flag, but
+  the live VDS API rejects it with `404934 Unrecognized field in request`. Verified
+  empirically during Phase 2 live UAT against 10ax.online.tableau.com on 2026-04-11.)
 
 **Claude API**
 - Model: `claude-sonnet-4-20250514`, always stream responses

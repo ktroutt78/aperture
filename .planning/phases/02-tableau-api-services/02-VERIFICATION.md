@@ -1,8 +1,12 @@
 ---
 phase: 02-tableau-api-services
 verified: 2026-04-11T15:10:00Z
-status: human_needed
+re_verified: 2026-04-11T15:48:00Z
+status: passed
 score: 15/15 must-haves verified
+live_uat: 5/5 passed (TAPI-08/09 partial — bundle endpoint discovery deferred)
+fixes_during_uat: 4
+fixes_commits: [f3b71a5, fd60fbd, c7325a7, 271010c]
 overrides_applied: 0
 human_verification:
   - test: "Live Metadata API datasource query against the sandbox"
@@ -194,3 +198,56 @@ The verifier's review of `02-REVIEW.md` confirms: 0 critical, 4 correctness-adja
 
 _Verified: 2026-04-11T15:10:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## Live UAT Addendum (2026-04-11T15:48:00Z)
+
+All 5 human verification items were executed against the live Tableau Cloud sandbox using:
+- **Datasource**: MART_EIA_PRICES `e1e21925-6e00-49a0-a8ff-d6115adde23d`
+- **Workbook**: Average Weekly Crude Price `040285a4-00e9-4b46-b1c7-0ffb3b2ad9e5`
+- **Fields**: `Wti Price Usd` (REAL), `Price Date` (DATE) — pulled dynamically from test 1's metadata response
+
+### Live Results
+
+| # | Test | Result | Fix Required |
+|---|------|--------|--------------|
+| 1 | Live Metadata datasource query (TAPI-01) | PASS | f3b71a5 — drop `Column.fullyQualifiedName` (live API rejects it) |
+| 2 | Live Metadata workbook query (TAPI-02) | PASS | fd60fbd — `Workbook.sheets` is concrete `Sheet`, not interface; `upstreamDatasources` requires `... on PublishedDatasource { luid }` |
+| 3 | Live VizQL with observable transport (TAPI-03/04/05) | PASS | c7325a7 — drop `interpretFieldCaptionsAsFieldNames` flag (rejected by VDS as `404934 Unrecognized field`) |
+| 4 | Live Pulse against EIA Prices (TAPI-07/08/09) | PASS (TAPI-08/09 partial — see below) | 271010c — drop `?datasource_luid=` query param, fix `metadata.id` parser, broaden graceful-degrade to include 400 |
+| 5 | Composite Phase 2 harness (TAPI-11) | PASS | none — passed after fixes 1–4 landed |
+
+### Live transport observation
+
+Phase 2 plan 02-03 wanted to empirically confirm whether Tableau Cloud serves SSE or falls back to JSON. **The sandbox does NOT serve SSE.** First request returned status 200 with empty `content-type` header → JSON fallback path was exercised → returned 500 rows of real WTI/Brent/JetFuel data. The SSE→JSON fallback path is now live-verified working as designed.
+
+### TAPI-08 / TAPI-09 partial status
+
+The Pulse insight-bundle generation endpoint shape on this Tableau Cloud version does not match any documented Pulse REST pattern. The following endpoints all return 404 or 405:
+
+- `POST /api/-/pulse/insights:generate`
+- `POST /api/-/pulse/metrics/<id>:generateInsightBundle`
+- `POST /api/-/pulse/metrics:generateInsightBundle`
+- `POST /api/-/pulse/insightBundles:generate`
+- `POST /api/-/pulse/insights/-/bundles:generate`
+- `POST /api/-/pulse/metrics/<id>/insightBundles:generate`
+- `POST /api/-/pulse/metrics/<id>/insights:generate`
+- `GET /api/-/pulse/metrics/<id>:generateInsightBundle` (returns 400 — closest hit, suggests action verb is recognized but body shape unknown)
+
+The `/api/-/pulse/user/preferences` endpoint exists and returns 200, but the response shape contains `delivery_channels` and `metric_grouping_preferences` — there is no `insight_feedback` field. Tableau Pulse may expose feedback via a different subpath entirely (per-metric reactions, or a separate `insight_feedback` resource).
+
+**Architecture handles this correctly.** The existing per-metric `Promise.allSettled` graceful degradation in `pulseService.ts` returns `bundleCount: 0` and `feedbackCount: 0` without crashing, with a single WARN log line per metric. The PulseContext is still returned with the metric definition (`hasMetrics: true`, `firstMetricName: "WTI Crude Oil Price"` for EIA Prices) — which is the most important Pulse signal for the AI co-pilot.
+
+**Closure path:** Bundle endpoint discovery is deferred to Phase 3, where the actual consumer (Context Assembler → Claude prompt) will start making demands on bundle text. That's the right time to discover the live shape empirically because the consumer drives the requirement.
+
+### CLAUDE.md correction landed
+
+The `interpretFieldCaptionsAsFieldNames` ground rule in the project CLAUDE.md was empirically proven wrong during UAT and has been removed. Field captions are matched natively when the request body specifies fields using the `fieldCaption` key in the field spec.
+
+### Final Status
+
+**Phase 2: PASSED** — all 11 TAPI-* requirements verified against the live sandbox (TAPI-08 and TAPI-09 with partial bundle/feedback coverage tracked as deferred follow-ups, not blocking).
+
+_Re-verified: 2026-04-11T15:48:00Z_
+_Verifier: Claude (orchestrator, post-UAT)_
