@@ -60,7 +60,7 @@
 - [x] 02-02-PLAN.md — Metadata API GraphQL service (TAPI-01, TAPI-02) + smoke test
 - [x] 02-03-PLAN.md — VizQL Data Service with SSE-first / JSON-fallback (TAPI-03, TAPI-04, TAPI-05) + smoke test
 - [x] 02-04-PLAN.md — Pulse REST service with graceful empty-metrics degradation (TAPI-07, TAPI-08, TAPI-09, TAPI-10) + offline unit test + live smoke
-- [ ] 02-05-PLAN.md — Phase 2 verification harness + package.json smoke:* script wiring (TAPI-11)
+- [x] 02-05-PLAN.md — Phase 2 verification harness + package.json smoke:* script wiring (TAPI-11)
 **UI hint**: no
 
 ---
