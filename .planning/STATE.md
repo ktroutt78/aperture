@@ -14,7 +14,7 @@ progress:
 
 # STATE: Aperture
 
-**Last updated:** 2026-04-11 (Phase 2 planned — 5 plans across 3 waves, ready to execute)
+**Last updated:** 2026-04-11 (Phase 2 complete — 11/11 TAPI-* requirements live-verified against the sandbox; ready to plan Phase 3)
 
 ---
 
@@ -22,7 +22,7 @@ progress:
 
 **Core Value:** A Tableau user sees streamed, schema-aware narrative intelligence (with anomaly tags that highlight marks in the viz) inside their dashboard within 3 seconds of selecting a mark or changing a filter — without leaving Tableau.
 
-**Current focus:** Phase 02 — Tableau API Services (planned, ready to execute)
+**Current focus:** Phase 03 — Context Assembler + Claude (ready to plan)
 
 **Authoritative docs:**
 
@@ -37,7 +37,7 @@ progress:
 ## Current Position
 
 Phase: 01 (Scaffold + Auth) — COMPLETE
-Phase: 02 (Tableau API Services) — PLANNED (5 plans, 3 waves, verification passed)
+Phase: 02 (Tableau API Services) — COMPLETE (5 plans, 3 waves, code review + live UAT passed; TAPI-08/09 partial — bundle endpoint discovery deferred to Phase 3)
 **Milestone:** v1 demo
 **Phase:** 3
 **Plan:** Not started
@@ -46,16 +46,16 @@ Phase: 02 (Tableau API Services) — PLANNED (5 plans, 3 waves, verification pas
 **Progress:**
 
 ```
-[██████████] Phase 1: Scaffold + Auth           (100% — complete)
-[===≡======] Phase 2: Tableau API Services      (planned, ready to execute)
-[..........] Phase 3: Context Assembler + Claude (0% — not started)
-[..........] Phase 4: Extension UI               (0% — not started)
-[..........] Phase 5: Polish + Docs              (0% — not started)
+[██████████] Phase 1: Scaffold + Auth             (100% — complete)
+[██████████] Phase 2: Tableau API Services        (100% — complete, live-verified)
+[..........] Phase 3: Context Assembler + Claude  (0% — ready to plan)
+[..........] Phase 4: Extension UI                (0% — not started)
+[..........] Phase 5: Polish + Docs               (0% — not started)
 ```
 
-**Phases complete:** 1/5
-**Requirements shipped:** SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05, SCAF-06, SCAF-07 (Phase 1 complete)
-**Requirements planned (not yet shipped):** TAPI-01, TAPI-02, TAPI-03, TAPI-04, TAPI-05, TAPI-06, TAPI-07, TAPI-08, TAPI-09, TAPI-10, TAPI-11 (Phase 2)
+**Phases complete:** 2/5
+**Requirements shipped:** SCAF-01..07 (Phase 1) + TAPI-01..11 (Phase 2; TAPI-08/09 partial — see 02-VERIFICATION.md Live UAT Addendum)
+**Requirements next:** CTX-01..17 (Phase 3 — Context Assembler + Claude)
 
 ---
 
