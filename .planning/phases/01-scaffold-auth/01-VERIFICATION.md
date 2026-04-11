@@ -1,9 +1,10 @@
 ---
 phase: 01-scaffold-auth
 verified_at: 2026-04-10T23:22:00Z
+verified_live_at: 2026-04-11T00:22:08Z
 verifier: gsd-verifier
-status: human_needed
-score: 9/9 automated must-haves verified (1 item awaiting live PAT)
+status: passed
+score: 10/10 (9 automated + 1 live Tableau handshake)
 requirements_verified:
   - SCAF-01
   - SCAF-02
@@ -14,31 +15,27 @@ requirements_verified:
   - SCAF-07
 human_verification:
   - test: "Live Tableau PAT signin against the real sandbox (SCAF-05 hard verification)"
-    expected: |
-      After populating .env with real values for TABLEAU_SERVER_URL, TABLEAU_SITE_NAME,
-      TABLEAU_PAT_NAME, TABLEAU_PAT_SECRET, running `pnpm --filter @aperture/backend smoke:auth`
-      should print:
+    status: resolved
+    resolved_at: 2026-04-11T00:22:08Z
+    evidence: |
+      User populated .env with real PAT credentials and ran `pnpm --filter @aperture/backend smoke:auth`.
+      Output:
         [smoke] Signin succeeded.
-        [smoke]   token prefix : <8 chars>...
-        [smoke]   site id      : <uuid>
-        [smoke]   expires at   : <ISO ~3h45m in the future>
+        [smoke]   token prefix : uiJi9MbU...
+        [smoke]   site id      : 5226297d-015e-4f41-bf29-00ef51da4543
+        [smoke]   expires at   : 2026-04-11T09:07:08.328Z
         [smoke] Token cache populated correctly.
-      Exit code 0.
-    why_human: |
-      Code path is fully present and smoke-verified on the cold branch (empty .env
-      triggers the "credentials not configured" path with exit 0). Real PAT credentials
-      are a user-supplied secret and the verifier does not have them. Verification
-      against the live Tableau Cloud REST API cannot be done programmatically without
-      those credentials.
+      Exit code 0. URL concatenation correct (no double-slash from trailing / in TABLEAU_SERVER_URL).
+      Pino redact confirmed working — only tokenPrefix (first 8 chars) appears in logs.
 ---
 
 # Phase 01: Scaffold + Auth Verification Report
 
 **Phase Goal:** Backend starts, `/health` returns 200, and a PAT auth call returns a valid Tableau token that the backend caches and auto-refreshes on 401.
 
-**Verified:** 2026-04-10T23:22:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Verified:** 2026-04-10T23:22:00Z (automated) + 2026-04-11T00:22:08Z (live Tableau handshake)
+**Status:** passed
+**Re-verification:** Yes — human_verification item SCAF-05 resolved via live smoke test
 
 ---
 
@@ -50,11 +47,11 @@ human_verification:
 | SCAF-02 | Vite + React + TS extension runs locally | ✓ verified |
 | SCAF-03 | Backend starts and `GET /health` returns HTTP 200 | ✓ verified (live smoke) |
 | SCAF-04 | `.env.example` declares all 8 required env vars | ✓ verified |
-| SCAF-05 | Backend PAT auth against Tableau Cloud REST API + X-Tableau-Auth token | ◐ human verification needed (code present + cold smoke passes) |
+| SCAF-05 | Backend PAT auth against Tableau Cloud REST API + X-Tableau-Auth token | ✓ verified (live signin against 10ax.online.tableau.com returned valid token + siteId) |
 | SCAF-06 | Token cache + auto-refresh on 401 with exactly-one retry | ✓ verified (code + wiring) |
 | SCAF-07 | Stub `.trex` manifest with `full data` permission | ✓ verified |
 
-**Verdict:** Phase goal achieved in code. All 7 SCAF requirements have landed working, production-quality implementations. The only deferred check is the live PAT handshake against the real Tableau Cloud sandbox, which requires user-supplied credentials that the verifier cannot obtain. All other scaffolding, wiring, and behavioral checks pass end-to-end.
+**Verdict:** Phase 1 goal achieved in code AND live-verified end-to-end. All 7 SCAF requirements implemented to production quality. SCAF-05 hard-verified on 2026-04-11T00:22:08Z — `tableauAuth.authenticate()` successfully handshakes with Tableau Cloud (`https://10ax.online.tableau.com/api/3.19/auth/signin` against site `aperture_app`), returns a valid token (prefix `uiJi9MbU...`) + site id (`5226297d-015e-4f41-bf29-00ef51da4543`), populates tokenCache with 3h45m expiry. Pino redact confirmed working — only tokenPrefix appears in logs, full token never leaks. Phase 1 is 100% complete and ready for Phase 2 (Tableau API Services) to layer on top of `tableauFetch`.
 
 ---
 
