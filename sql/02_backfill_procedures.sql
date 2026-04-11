@@ -47,7 +47,7 @@ CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION APERTURE_API_ACCESS
 -- ============================================================================
 -- 1. SP_BACKFILL_EIA_PRICES
 --    Pulls 3 years of daily petroleum spot prices from EIA API v2.
---    Series: WTI, Brent, Regular Gasoline, Jet Fuel, Diesel
+--    Series: WTI, Brent, Jet Fuel (gasoline/diesel via SP_BACKFILL_EIA_RETAIL_PRICES)
 --    Idempotent via MERGE on (PRICE_DATE, SERIES_ID).
 -- ============================================================================
 CREATE OR REPLACE PROCEDURE APERTURE_DB.ENERGY.SP_BACKFILL_EIA_PRICES()
@@ -79,12 +79,13 @@ def run(session):
         """).collect()
         return msg
 
+    # NOTE: Gasoline and Diesel retail prices use the v2 faceted endpoint
+    # and are loaded by SP_BACKFILL_EIA_RETAIL_PRICES (series IDs:
+    # EMM_EPM0_PTE_NUS_DPG, EMD_EPD2DXL0_PTE_NUS_DPG).
     series_map = {
         'PET.RWTC.D':  ('WTI Crude Oil', 'USD/barrel', 0),
         'PET.RBRTE.D': ('Brent Crude Oil', 'USD/barrel', 0),
-        'PET.EMM_EPMR_PTE_NUS_DPG.D': ('Regular Gasoline', 'USD/gallon', 0),
         'PET.EER_EPJK_PF4_RGC_DPG.D': ('Jet Fuel Gulf Coast', 'USD/gallon', 3),
-        'PET.EER_EPD2F_PF4_RGC_DPG.D': ('No 2 Diesel Gulf Coast', 'USD/gallon', 3),
     }
 
     end_date = datetime.now().strftime('%Y-%m-%d')

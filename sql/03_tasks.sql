@@ -10,6 +10,7 @@
 --   ALTER TASK APERTURE_DB.ENERGY.TASK_WEEKLY_EIA_INVENTORY RESUME;
 --   ALTER TASK APERTURE_DB.ENERGY.TASK_WEEKLY_GDELT_EVENTS RESUME;
 --   ALTER TASK APERTURE_DB.ENERGY.TASK_MONTHLY_EIA_STEO RESUME;
+--   ALTER TASK APERTURE_DB.ENERGY.TASK_WEEKLY_EIA_RETAIL_PRICES RESUME;
 -- =============================================================================
 
 USE ROLE SYSADMIN;
@@ -66,3 +67,13 @@ CREATE OR REPLACE TASK APERTURE_DB.ENERGY.TASK_MONTHLY_EIA_STEO
   COMMENT = 'Monthly STEO forecast refresh — 10th of month 2 PM ET (after EIA STEO release)'
 AS
   CALL APERTURE_DB.ENERGY.SP_BACKFILL_EIA_STEO();
+
+-- ---- 6. Weekly EIA Retail Prices ----
+-- Refreshes retail gasoline and diesel prices (v2 faceted endpoint, weekly data).
+-- Schedule: Tuesday 7 AM ET (EIA publishes weekly retail prices on Mondays).
+CREATE OR REPLACE TASK APERTURE_DB.ENERGY.TASK_WEEKLY_EIA_RETAIL_PRICES
+  WAREHOUSE = COMPUTE_WH
+  SCHEDULE = 'USING CRON 0 7 * * 2 America/New_York'
+  COMMENT = 'Weekly EIA retail gasoline/diesel price refresh — Tuesday 7 AM ET (after Monday EIA release)'
+AS
+  CALL APERTURE_DB.ENERGY.SP_BACKFILL_EIA_RETAIL_PRICES();
