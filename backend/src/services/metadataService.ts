@@ -169,7 +169,6 @@ interface FieldsForDatasourcesResponse {
       dataType?: string | null;
       upstreamColumns?: ReadonlyArray<{
         name?: string | null;
-        fullyQualifiedName?: string | null;
       }> | null;
     }>;
   }>;
@@ -186,7 +185,7 @@ const FIELDS_FOR_DATASOURCES_QUERY = /* GraphQL */ `
       fields {
         name
         description
-        upstreamColumns { name fullyQualifiedName }
+        upstreamColumns { name }
         ... on ColumnField { dataType }
         ... on CalculatedField { dataType }
       }
@@ -198,14 +197,14 @@ const FIELDS_FOR_DATASOURCES_QUERY = /* GraphQL */ `
  * Coerce a single GraphQL `field` node into the shared `SchemaField` contract
  * from 02-01. Any missing string becomes `''`; `dataType` defaults to
  * `'UNKNOWN'` when neither ColumnField nor CalculatedField fragment matches.
- * Upstream lineage prefers `fullyQualifiedName` and falls back to `name`.
+ * Upstream lineage uses the column `name` from the Metadata API `Column` type.
  */
 function toSchemaField(field: NonNullable<
   NonNullable<FieldsForDatasourcesResponse['publishedDatasources']>[number]['fields']
 >[number]): SchemaField {
   const lineage: string[] = [];
   for (const col of field.upstreamColumns ?? []) {
-    const ref = col.fullyQualifiedName ?? col.name ?? '';
+    const ref = col.name ?? '';
     if (ref) lineage.push(ref);
   }
   const name = field.name ?? '';
