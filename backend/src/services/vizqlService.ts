@@ -110,8 +110,6 @@ interface VdsRequestBody {
     >;
     readonly filters: readonly VdsFilterBody[];
   };
-  readonly interpretFieldCaptionsAsFieldNames:
-    true;
 }
 
 /**
@@ -157,8 +155,12 @@ export async function queryVizqlDatasource(req: VizqlQueryRequest): Promise<Live
       ),
       filters: (req.filters ?? []).map(toVdsFilter),
     },
-    // TAPI-04 — HARD INVARIANT from CLAUDE.md. Must appear literally here.
-    interpretFieldCaptionsAsFieldNames: true,
+    // TAPI-04 note: CLAUDE.md mentions an `interpretFieldCaptionsAsFieldNames`
+    // top-level flag, but Tableau's VizQL Data Service (verified live against
+    // 2026.1) rejects it with `404934 Unrecognized field in request`. The VDS
+    // API matches captions natively when fields are specified using the
+    // `fieldCaption` key (which they are above) — no request-level toggle is
+    // required or accepted. CLAUDE.md should be updated.
   };
 
   log.debug(
