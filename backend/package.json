@@ -14,7 +14,8 @@
     "smoke:vizql": "tsx src/services/__tests__/vizqlService.smoke.ts",
     "smoke:pulse": "tsx src/services/__tests__/pulseService.smoke.ts",
     "smoke:pulse:empty": "tsx src/services/__tests__/pulseService.empty.test.ts",
-    "smoke:phase2": "tsx src/services/__tests__/phase2.smoke.ts"
+    "smoke:phase2": "tsx src/services/__tests__/phase2.smoke.ts",
+    "smoke:list-datasources": "tsx src/services/__tests__/listDatasources.smoke.ts"
   },
   "dependencies": {
     "fastify": "^5.0.0",
