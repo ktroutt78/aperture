@@ -9,7 +9,12 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke:auth": "tsx src/services/__tests__/tableauAuth.smoke.ts"
+    "smoke:auth": "tsx src/services/__tests__/tableauAuth.smoke.ts",
+    "smoke:metadata": "tsx src/services/__tests__/metadataService.smoke.ts",
+    "smoke:vizql": "tsx src/services/__tests__/vizqlService.smoke.ts",
+    "smoke:pulse": "tsx src/services/__tests__/pulseService.smoke.ts",
+    "smoke:pulse:empty": "tsx src/services/__tests__/pulseService.empty.test.ts",
+    "smoke:phase2": "tsx src/services/__tests__/phase2.smoke.ts"
   },
   "dependencies": {
     "fastify": "^5.0.0",
