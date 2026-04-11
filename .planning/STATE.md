@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-last_updated: "2026-04-10T23:19:04.759Z"
+last_updated: "2026-04-11T18:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 4
+  total_plans: 9
   completed_plans: 4
-  percent: 100
+  percent: 44
 ---
 
 # STATE: Aperture
 
-**Last updated:** 2026-04-10 (Phase 1 complete — Plan 01-04 Tableau PAT auth shipped)
+**Last updated:** 2026-04-11 (Phase 2 planned — 5 plans across 3 waves, ready to execute)
 
 ---
 
@@ -22,7 +22,7 @@ progress:
 
 **Core Value:** A Tableau user sees streamed, schema-aware narrative intelligence (with anomaly tags that highlight marks in the viz) inside their dashboard within 3 seconds of selecting a mark or changing a filter — without leaving Tableau.
 
-**Current focus:** Phase 02 — Tableau API Services (next)
+**Current focus:** Phase 02 — Tableau API Services (planned, ready to execute)
 
 **Authoritative docs:**
 
@@ -37,17 +37,17 @@ progress:
 ## Current Position
 
 Phase: 01 (Scaffold + Auth) — COMPLETE
-Plan: 4 of 4
+Phase: 02 (Tableau API Services) — PLANNED (5 plans, 3 waves, verification passed)
 **Milestone:** v1 demo
 **Phase:** 2
-**Plan:** Not started
-**Status:** Ready to plan
+**Plan:** 5 of 5 written, 0 of 5 executed
+**Status:** Ready to execute — `/gsd-execute-phase 2`
 
 **Progress:**
 
 ```
 [██████████] Phase 1: Scaffold + Auth           (100% — complete)
-[..........] Phase 2: Tableau API Services      (0% — not started)
+[===≡======] Phase 2: Tableau API Services      (planned, ready to execute)
 [..........] Phase 3: Context Assembler + Claude (0% — not started)
 [..........] Phase 4: Extension UI               (0% — not started)
 [..........] Phase 5: Polish + Docs              (0% — not started)
@@ -55,6 +55,7 @@ Plan: 4 of 4
 
 **Phases complete:** 1/5
 **Requirements shipped:** SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05, SCAF-06, SCAF-07 (Phase 1 complete)
+**Requirements planned (not yet shipped):** TAPI-01, TAPI-02, TAPI-03, TAPI-04, TAPI-05, TAPI-06, TAPI-07, TAPI-08, TAPI-09, TAPI-10, TAPI-11 (Phase 2)
 
 ---
 
@@ -99,6 +100,9 @@ Plan: 4 of 4
 | Tableau REST API version = 3.19 | Stable minimum supporting PAT signin for Metadata + VizQL + Pulse on Tableau Cloud 2024.2+ | Phase 1 (Plan 01-04) |
 | Token cache = in-memory singleton, 3h45m proactive expiry + reactive 401 refresh | Single-process backend; 15-min safety margin under 4h PAT hard expiry; reactive refresh covers any unexpected revocation | Phase 1 (Plan 01-04) |
 | `tableauFetch(url, init)` is the single chokepoint for all Tableau API calls | Enforces X-Tableau-Auth injection + exactly-one 401 retry in exactly one place; Phase 2 services MUST use it | Phase 1 (Plan 01-04) |
+| Data foundation: 5 independent Snowflake marts published as **5 independent Tableau datasources** (no Tableau-layer joins, no Tableau relationships) | Cortex's design rule: "marts are never joined to each other." Claude + VizQL is the correlation engine. Cross-source relationships (prices↔inventory, geopolitical↔prices, weather↔demand) are discovered at query time by the Context Assembler in Phase 3, not pre-joined in SQL or Tableau. | Phase 2 planning (2026-04-11) |
+| Phase 2 service architecture: LUID-parameterized — Metadata/VizQL/Pulse services take datasource LUIDs as input, not hardcoded to any specific datasource | Enables Phase 3's Context Assembler to fan out to all 5 datasources with `Promise.all`; services are agnostic to how many datasources exist | Phase 2 planning (2026-04-11) |
+| Primary test subject for Phase 2 smokes = **EIA Prices datasource** (`MART_EIA_PRICES`) | It's the only datasource with a Pulse metric (WTI Crude Oil Price), so Pulse smoke hits `hasMetrics: true` happy path instead of silently cold-booting to empty | Phase 2 planning (2026-04-11) |
 
 ### Invariants (never regress)
 
@@ -115,13 +119,15 @@ Plan: 4 of 4
 - No hardcoded secrets — everything through `.env`.
 - All Tableau API calls in Phase 2+ MUST go through `tableauFetch` — never construct `X-Tableau-Auth` headers anywhere else.
 - Never log the full Tableau session token or PAT secret — only `tokenPrefix` (first 8 chars) and `siteId`.
+- Tableau datasources are never pre-joined at the Tableau layer. All cross-source correlation happens in the Context Assembler (Phase 3) and Claude's narrative (Phase 3+). SQL marts are also independent — no cross-source joins, no shared dimension tables across data domains.
 
 ### Open Todos
 
 - [x] ~~Run `/gsd-plan-phase 1` to decompose Phase 1 (Scaffold + Auth) into executable plans.~~ (Done — 4 plans executed)
 - [x] ~~During Phase 1 planning, make and log the backend framework + hosting decision.~~ (Done — Plan 01-04 Task 3)
-- [ ] User: populate `.env` with real Tableau Cloud PAT credentials and rerun `pnpm --filter @aperture/backend smoke:auth` to hard-verify SCAF-05 against the live sandbox.
-- [ ] Run `/gsd-plan-phase 2` to decompose Phase 2 (Tableau API Services) into Metadata / VizQL / Pulse service plans.
+- [x] ~~User: populate `.env` with real Tableau Cloud PAT credentials and rerun `pnpm --filter @aperture/backend smoke:auth` to hard-verify SCAF-05 against the live sandbox.~~ (Done — commit `bb5327a`)
+- [x] ~~Run `/gsd-plan-phase 2` to decompose Phase 2 (Tableau API Services) into Metadata / VizQL / Pulse service plans.~~ (Done — commit `85f945d`, 5 plans across 3 waves, verification passed iteration 1)
+- [ ] Run `/gsd-execute-phase 2` to ship Phase 2 (see "Phase 2 Execution Inputs" below for required args).
 
 ### Blockers
 
@@ -131,22 +137,53 @@ None. Phase 1 is shippable. SCAF-05 live verification is deferred to user setup 
 
 ## Session Continuity
 
-**Last session:** 2026-04-10 — Phase 1 completed. Plan 01-04 shipped Tableau PAT authentication pipeline (tokenCache singleton, authenticate() against REST API 3.19, tableauFetch wrapper with exactly-one 401 retry, smoke:auth script) plus logged Fastify 5 + Fly.io architecture decisions in PROJECT.md. Three atomic commits (`ba40b52`, `77225c3`, `0307016`) + SUMMARY.md.
+**Last session:** 2026-04-11 — Phase 2 planned and ready to execute. Five plans written across three waves (commit `85f945d`), plan checker passed on iteration 1 with zero revisions. In parallel, the Cortex data foundation was refactored from a monolithic `MART_ENERGY_DAILY` view into 5 independent marts matching the 5-datasource Tableau architecture (commit `3750be1`), and Tableau workbook/extract files were gitignored with the schema reference doc moved to `docs/data_source_documentation.md` (commit `4c42675`). User set up 4 Tableau Pulse metrics (WTI Price, US Total Crude Inventory, Midwest HDD, Middle East Tension Score), skipping the EIA STEO datasource metric-less per plan. API Access permission confirmed on all datasources, LUIDs collected, `.env` working.
 
-**Next session should:**
+## Phase 2 Execution Inputs (for `/gsd-execute-phase 2`)
 
-1. Read `.planning/phases/01-scaffold-auth/01-04-SUMMARY.md` for Phase 1 wrap-up context.
-2. Read `.planning/ROADMAP.md` Phase 2 section and `aperture-spec.md` Phase 2 section (three services: Metadata GraphQL, VizQL Data Service, Pulse REST).
-3. Run `/gsd-plan-phase 2` to decompose Phase 2 into service-level plans.
-4. Remind the user that Phase 2 verification requires real Tableau Cloud PAT credentials in `.env` — have them rerun `pnpm --filter @aperture/backend smoke:auth` to confirm live signin before starting Phase 2.
+**Data architecture (authoritative — Phase 3+ must honor this):**
 
-**Key context for Phase 2 planners:**
+- **5 independent Snowflake marts** = **5 independent Tableau datasources** (no Tableau-layer joins, no Tableau relationships, no bundled publishing):
+  1. **EIA Prices** (`MART_EIA_PRICES`) — daily WTI/Brent/Gasoline/Jet/Diesel, national grain, ~5k rows, back to 2006 — **PRIMARY TEST SUBJECT for Phase 2 smokes** (has the WTI Pulse metric)
+  2. **EIA Inventory** (`MART_EIA_INVENTORY`) — weekly petroleum inventory by PADD, ~11.7k rows, back to 1982
+  3. **EIA STEO** (`MART_EIA_STEO`) — monthly forecasts, ~456 rows — **NO Pulse metric by design** (monthly + forward-looking is a poor Pulse fit; forecast divergence is a Phase 3 Claude-narrative concern)
+  4. **Weather** (`MART_WEATHER`) — daily NOAA temperature + degree days by PADD, ~5.5k rows
+  5. **Geopolitical** (`MART_GEOPOLITICAL`) — weekly GDELT event scores by country, ~21.6k rows
+- Full schema reference: `docs/data_source_documentation.md`
+- Claude + VizQL = the correlation engine. Cross-source relationships (prices↔inventory, geopolitical↔prices, weather↔distillate-demand) are discovered at query time in Phase 3's Context Assembler, never pre-joined.
+
+**Tableau Pulse metrics configured (2026-04-11):**
+
+| # | Datasource | Metric | Measure | Filter | Grain |
+|---|---|---|---|---|---|
+| 1 | EIA Prices | WTI Crude Oil Price | `WTI_PRICE_USD` | none | daily |
+| 2 | EIA Inventory | US Total Crude Oil Inventory | `CRUDE_INVENTORY_KBBL` | `PADD_ID = 0` | weekly |
+| 3 | Weather | Midwest Heating Degree Days | `HEATING_DEGREE_DAYS` | `PADD_ID = 2` | daily |
+| 4 | Geopolitical | Middle East Tension Score | `GEOPOLITICAL_TENSION_SCORE` | `COUNTRY_CODE IN ('SAU','IRN','IRQ','KWT','ARE','YEM')` | weekly |
+
+**Execution guidance for the smoke tests:**
+
+- When `02-02 metadataService.smoke` / `02-03 vizqlService.smoke` / `02-04 pulseService.smoke` / `02-05 phase2.smoke` prompt for `--datasource <LUID>`, pass the **EIA Prices datasource LUID** as the primary subject. That's the only datasource guaranteed to hit Pulse's `hasMetrics: true` happy path with the WTI metric configured on it.
+- The other 3 Pulse-equipped datasources (Inventory, Weather, Geopolitical) are available for optional additional smoke runs — but EIA Prices is the single LUID that makes TAPI-07/08/09 live-verifiable in one pass.
+- The EIA STEO datasource, if published, will return an empty `PulseContext` when the Pulse smoke hits it — this is the TAPI-10 graceful-degradation path and is additionally enforced by the offline unit test `pulseService.empty.test.ts`.
+- Pulse insight bundles generate **asynchronously** after metric creation; metrics were configured 2026-04-11, so insights should be populated by execution time. If `hasMetrics: true` but `insightBundles: []`, wait 10–15 minutes and re-run the Pulse smoke — not a code bug.
+
+**Key context for Phase 2 executors (same as planner context, repeated here for session-continuity):**
 
 - `tableauFetch` is the single chokepoint. Metadata / VizQL / Pulse services each import `tableauFetch` from `backend/src/services/tableauFetch.js` and call it instead of native `fetch`. Never touch `X-Tableau-Auth` directly.
 - `tokenCache` is private — Phase 2 services should not import it. Use `getOrRefreshToken()` / `forceRefreshToken()` as the public auth surface if they need to trigger a refresh outside a fetch call (rare).
-- Pino redact paths already cover the PAT secret. Services can log request/response bodies freely.
-- Fastify `app.register()` pattern is the route-addition mechanism. Each service gets its own route file under `backend/src/routes/`.
+- Pino redact paths already cover the PAT secret. Services can log request/response bodies freely — but NEVER `console.log` Pulse `insightBundles` (PII concern; plan 02-04 acceptance criteria grep-enforces this).
+- Fastify `app.register()` pattern is the route-addition mechanism — but Phase 2 plans do NOT create any new routes. All three services are pure service modules under `backend/src/services/` called by Phase 3's `/context` route (which is a Phase 3 deliverable, not Phase 2).
+- The Pulse REST API endpoint paths in `02-04-PLAN.md` are best-guess starting points (Tableau's Pulse REST surface evolves). The executor MUST verify the actual paths against the live sandbox during Task 1 and document corrections in `02-04-SUMMARY.md`. Because any 404 silently degrades to empty `PulseContext`, the SUMMARY must positively confirm at least one live run observed `hasMetrics: true` before declaring TAPI-07/08/09 verified.
+
+**Next session should:**
+
+1. Read this STATE.md (Session Continuity + Phase 2 Execution Inputs sections).
+2. Read `.planning/phases/02-tableau-api-services/02-0{1..5}-PLAN.md`.
+3. Have the EIA Prices datasource LUID ready to paste when the executor prompts.
+4. Run `/gsd-execute-phase 2`.
 
 ---
 *State initialized: 2026-04-10*
 *Phase 1 completed: 2026-04-10*
+*Phase 2 planned: 2026-04-11 (ready to execute)*
