@@ -81,10 +81,17 @@ function emptyPulseContext(datasourceLuid: string): PulseContext {
 
 interface PulseDefinitionsResponse {
   definitions?: Array<{
+    // Live Tableau Cloud Pulse REST returns the metric-definition ID nested under
+    // `metadata.id` (along with name + description). Older shapes flattened these
+    // to top-level keys, so we keep both as optional for tolerance.
     id?: string;
-    metadata?: { name?: string; description?: string };
+    metadata?: { id?: string; name?: string; description?: string };
     name?: string;
     description?: string;
+    // The datasource LUID a definition is bound to lives at
+    // `specification.datasource.id`. There is NO server-side filter for it on
+    // /api/-/pulse/definitions — we filter client-side after the fetch.
+    specification?: { datasource?: { id?: string } };
   }>;
 }
 
@@ -135,8 +142,14 @@ export async function fetchPulseContext(datasourceLuid: string): Promise<PulseCo
 
   // --------------------------------------------------------------------------
   // Step A — fetch metric definitions (TAPI-07)
+  //
+  // Tableau Pulse REST does NOT accept any server-side `datasource_*` filter
+  // on this endpoint (verified live: ?datasource_luid= and ?datasource_id=
+  // both return HTTP 400 "Invalid request"). The bare endpoint returns every
+  // definition the authenticated user can see; we filter client-side by
+  // `specification.datasource.id` below.
   // --------------------------------------------------------------------------
-  const defsUrl = `${base}/api/-/pulse/definitions?datasource_luid=${encodeURIComponent(datasourceLuid)}`;
+  const defsUrl = `${base}/api/-/pulse/definitions`;
   log.debug({ datasourceLuid }, 'Pulse: fetching metric definitions');
 
   let defsRes: Response;
@@ -149,8 +162,11 @@ export async function fetchPulseContext(datasourceLuid: string): Promise<PulseCo
     throw new PulseServiceError('Pulse definitions fetch failed (network)', { cause: err });
   }
 
-  // TAPI-10 path (a) + (b): 404 / 403 → degrade gracefully.
-  if (defsRes.status === 404 || defsRes.status === 403) {
+  // TAPI-10 path (a) + (b): 404 / 403 → degrade gracefully. The same rule
+  // applies to 400 because Tableau Pulse REST uses HTTP 400 to indicate
+  // "this site has Pulse off / definitions endpoint refuses the request" on
+  // some configurations — there is no metric data either way.
+  if (defsRes.status === 404 || defsRes.status === 403 || defsRes.status === 400) {
     log.info(
       { datasourceLuid, status: defsRes.status },
       'Pulse definitions unavailable — returning empty PulseContext (TAPI-10)',
@@ -175,17 +191,18 @@ export async function fetchPulseContext(datasourceLuid: string): Promise<PulseCo
     throw new PulseServiceError('Pulse definitions returned non-JSON body', { cause: err });
   }
 
+  // Filter client-side to definitions bound to the requested datasource, then
+  // normalize. Live Pulse REST nests the metric ID under `metadata.id`; older
+  // shapes used a top-level `id` — accept either for tolerance.
   const metricDefinitions: PulseMetricDefinition[] = (defsJson.definitions ?? [])
-    .filter((d): d is { id: string; metadata?: { name?: string; description?: string }; name?: string; description?: string } =>
-      typeof d?.id === 'string' && d.id.length > 0,
-    )
+    .filter((d) => d?.specification?.datasource?.id === datasourceLuid)
     .map((d) => ({
-      id: d.id,
-      // Pulse API has evolved field naming; prefer metadata.name if present, fall back to top-level name.
+      id: d.metadata?.id ?? d.id ?? '',
       name: d.metadata?.name ?? d.name ?? '',
       description: d.metadata?.description ?? d.description ?? '',
       datasourceLuid,
-    }));
+    }))
+    .filter((m) => m.id.length > 0);
 
   // TAPI-10 path (c): HTTP 200 but no definitions → degrade gracefully.
   // Do NOT call insights:generate — there is literally nothing to generate
