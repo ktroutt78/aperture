@@ -3,7 +3,7 @@ phase: 03-context-assembler-claude
 plan: 02
 type: execute
 wave: 1
-depends_on: []
+depends_on: [03-01]
 files_modified:
   - backend/src/services/streamParser.ts
   - backend/src/services/__tests__/streamParser.test.ts
@@ -18,11 +18,12 @@ must_haves:
     - "StreamParser strips the trailing {\"suggestions\":[...]} JSON from the token stream and emits a typed suggestions event"
     - "StreamParser handles chunk-boundary splits inside both tag forms without losing, duplicating, or leaking tag characters into the token output"
     - "Malformed suggestions JSON emits suggestions { items: [] } and logs a warn, never throws"
-    - "StreamParser emits typed events token | anomaly | suggestions | done with exact shapes matching D-07"
+    - "StreamParser emits typed events token | anomaly | suggestions | done | error with exact shapes matching D-07"
+    - "The exported StreamParserEvent union includes an error variant { code: ErrorCode, message: string } so claudeService can yield error events without type casts"
     - "Offline unit tests enforce every chunk-boundary edge case with deterministic fixtures"
   artifacts:
     - path: "backend/src/services/streamParser.ts"
-      provides: "class StreamParser — stateful tag + suggestions state machine"
+      provides: "class StreamParser — stateful tag + suggestions state machine; exported StreamParserEvent union covering all D-07 events including error"
       contains: "class StreamParser"
     - path: "backend/src/services/__tests__/streamParser.test.ts"
       provides: "Offline tests for every chunk-boundary and malformed-input case"
@@ -33,14 +34,16 @@ must_haves:
   key_links:
     - from: "backend/src/services/streamParser.ts"
       to: "backend/src/types/copilot.ts"
-      via: "import type { ErrorCode } — imported lazily, parser does not emit error events itself"
-      pattern: "StreamParser"
+      via: "import type { ErrorCode } — needed for the error variant of StreamParserEvent"
+      pattern: "ErrorCode"
 ---
 
 <objective>
 Build the stateful `StreamParser` class that owns the anomaly-tag and suggestions-JSON state machines. This class is the single point in Phase 3 that transforms a raw Claude text stream into the typed event sequence Phase 4's EventSource consumes (D-06, D-07, D-08, D-09). It is 100% offline-testable — no Anthropic SDK, no Fastify, no network. Downstream plans (03-05 ClaudeService, 03-06 /chat route) feed it chunks and subscribe to its events.
 
 Purpose: Chunk-boundary robustness is THE load-bearing property of the SSE contract. A split mid-tag must NOT leak `[ANOM` into a token event nor drop the tag. A split mid-JSON must NOT leak `{"sugges` nor drop the suggestions event. Prove both with deterministic fixtures in a Wave 1 offline test so downstream plans inherit a verified primitive.
+
+**Type contract (load-bearing for Wave 2):** The exported `StreamParserEvent` union MUST include an `error` variant so `claudeService` (Plan 03-05) can yield error events directly without `as unknown as StreamParserEvent` casts. The `error` variant carries the stable `ErrorCode` enum from Plan 03-01. Plan 03-02's `depends_on` is therefore `[03-01]` — still Wave 1 since 03-01 itself has no dependencies.
 
 Output: One class, one test file, one npm script.
 </objective>
@@ -64,7 +67,8 @@ Output: One class, one test file, one npm script.
   <name>Task 1: Write offline StreamParser tests first (RED) and StreamParser implementation to pass them (GREEN)</name>
   <files>backend/src/services/__tests__/streamParser.test.ts, backend/src/services/streamParser.ts</files>
   <read_first>
-    - .planning/phases/03-context-assembler-claude/03-CONTEXT.md (D-07 event catalog, D-08 anomaly tag stripping, D-09 suggestions parsing)
+    - .planning/phases/03-context-assembler-claude/03-CONTEXT.md (D-07 event catalog including the error event, D-08 anomaly tag stripping, D-09 suggestions parsing)
+    - backend/src/types/copilot.ts (from Plan 03-01 — `ErrorCode` type import; the union must reference this exactly)
     - backend/src/services/__tests__/pulseService.empty.test.ts (to see the project's offline-test style: pure Node, assert, no test framework; `.test.ts` convention)
     - backend/package.json (to see existing `smoke:*` npm script ordering)
   </read_first>
@@ -95,22 +99,40 @@ Output: One class, one test file, one npm script.
 
     8. **Whitespace tolerance on suggestions opener.** Input: `text\n\n  {"suggestions": [ "a", "b", "c" ]}`. Expected: clean extraction, items: ["a","b","c"], token stream ends at the first whitespace preceding the `{`.
 
-    9. **Event ordering invariant.** `done` must ALWAYS be the last event. `suggestions` must always precede `done`. `context` is emitted by the route, not by this parser — parser must NOT emit `context`.
+    9. **Event ordering invariant.** `done` must ALWAYS be the last event. `suggestions` must always precede `done`. `context` is emitted by the route, not by this parser — parser must NOT emit `context`. The parser MAY accept externally-produced `error` events via the exported union type, but the state machine itself never emits `error` (claudeService does, in Plan 03-05).
 
     10. **Tag with escaped quotes inside value.** Input: `[ANOMALY: fieldName="A" value="B\"C"]`. Expected: anomaly { fieldName: "A", value: 'B"C', raw: '[ANOMALY: fieldName="A" value="B\\"C"]' }. (Planner note: implementation may choose to not support embedded quotes and document it — but the parser must not crash.)
 
     Edge rule: if implementation cannot support case 10, the test for case 10 should assert the tag is dropped (warn logged) rather than crashing — still a pass.
+
+    **Type-contract test (compile-time, not runtime):**
+
+    11. **StreamParserEvent union includes the error variant.** At the top of the test file, add:
+        ```ts
+        import type { StreamParserEvent } from '../streamParser.js';
+        // Compile-time assertion: the union MUST include an error variant.
+        // If claudeService (Plan 03-05) breaks, this line breaks first with a
+        // clear type error instead of a cryptic cast.
+        const _typecheck: StreamParserEvent = {
+          type: 'error',
+          data: { code: 'ANTHROPIC_ERROR', message: 'x' },
+        };
+        void _typecheck;
+        ```
+        This is not a runtime case — it's a compile-time fence. `pnpm typecheck` catches regressions. Runtime test count still covers 8+ state-machine cases.
   </behavior>
   <action>
 **Step A — Write the test file first (RED).** Create `backend/src/services/__tests__/streamParser.test.ts` using the same style as `backend/src/services/__tests__/pulseService.empty.test.ts`: pure Node `assert` (no vitest/jest, no test framework, runs under `tsx`), top-level `async function main()` with numbered test cases, a captured events array, and process.exit(failures > 0 ? 1 : 0) at the end.
 
 Each test feeds a `StreamParser` with chunks via a loop calling `parser.feed(chunk)` (synchronous — the parser does NOT await). The parser exposes typed callbacks or a `.on(type, handler)` method. At end of stream, test calls `parser.end({ stopReason: 'end_turn', usage: { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0 } })` which triggers `suggestions` (if not already) and `done`.
 
-Every test captures the emitted events into a plain array `events: Array<{type: 'token'|'anomaly'|'suggestions'|'done', data: unknown}>` and asserts:
+Every test captures the emitted events into a plain array `events: Array<StreamParserEvent>` and asserts:
   - NO element of events where `type === 'token'` has a `text` field containing the substring `[ANOMALY` or `{"suggestions"`
   - The full concatenation of all token `text` values equals the input with every tag and suggestions JSON removed
   - The anomaly events appear in the same order the tags appeared in the input
   - The done event is the last event
+
+Include the Test 11 compile-time fence at the top of the file (see behavior section).
 
 **Step B — Run the test, confirm RED** (parser file does not exist yet, expect tsx import failure). Document this in the SUMMARY.
 
@@ -118,6 +140,7 @@ Every test captures the emitted events into a plain array `events: Array<{type: 
 
 ```typescript
 import { createLogger } from '../lib/logger.js';
+import type { ErrorCode } from '../types/copilot.js';
 
 const log = createLogger({ pretty: process.env.NODE_ENV !== 'production' }).child({
   module: 'streamParser',
@@ -131,12 +154,26 @@ export interface DoneEvent {
   narrativeChars: number;
   usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number };
 }
+export interface ErrorEvent { code: ErrorCode; message: string; }
 
+/**
+ * Union of every event type that flows through the SSE wire, per D-07.
+ *
+ * IMPORTANT: This union covers ALL events a route or upstream service may emit —
+ * not just the ones the parser state machine produces. Plan 03-05 (claudeService)
+ * yields `error` events through this same union so the route can `write(ev.type, ev.data)`
+ * uniformly. Do NOT remove the `error` variant; removing it breaks claudeService
+ * type-checking and forces `as unknown as StreamParserEvent` casts.
+ *
+ * Events produced by the parser itself: token | anomaly | suggestions | done.
+ * Events produced by claudeService: error (in addition to forwarding parser events).
+ */
 export type StreamParserEvent =
   | { type: 'token'; data: TokenEvent }
   | { type: 'anomaly'; data: AnomalyEvent }
   | { type: 'suggestions'; data: SuggestionsEvent }
-  | { type: 'done'; data: DoneEvent };
+  | { type: 'done'; data: DoneEvent }
+  | { type: 'error'; data: ErrorEvent };
 
 export type StreamParserHandler = (ev: StreamParserEvent) => void;
 
@@ -155,6 +192,9 @@ type Mode = 'text' | 'maybe-tag' | 'in-tag' | 'maybe-suggestions' | 'in-suggesti
  *     of stream if never seen / malformed.
  *   - 'done' is the last event. Always emitted exactly once via .end().
  *   - Malformed tags/JSON drop the buffered chars and log warn — never throw.
+ *   - Parser NEVER emits 'error' itself. The 'error' variant exists in the
+ *     exported union so claudeService (Plan 03-05) can yield error events
+ *     through the same type without casts.
  */
 export class StreamParser {
   private mode: Mode = 'text';
@@ -250,7 +290,7 @@ The executor MUST finish implementing `consumeChar` as a real char-by-char state
 
 **Step E — Add the npm script.** Edit `backend/package.json` to add `"smoke:streamparser": "tsx src/services/__tests__/streamParser.test.ts"` directly after `"smoke:pulse:empty"` (preserves Phase 2 ordering: `smoke:auth → smoke:metadata → smoke:vizql → smoke:pulse → smoke:pulse:empty → smoke:streamparser → smoke:phase2`).
 
-Do NOT add any dependency to package.json. The parser uses only built-in `JSON.parse` and the existing logger.
+Do NOT add any dependency to package.json. The parser uses only built-in `JSON.parse`, the existing logger, and a type-only import of `ErrorCode` from Plan 03-01.
   </action>
   <verify>
     <automated>pnpm --filter @aperture/backend smoke:streamparser</automated>
@@ -265,15 +305,18 @@ Do NOT add any dependency to package.json. The parser uses only built-in `JSON.p
     - `grep -q "type: 'anomaly'" backend/src/services/streamParser.ts`
     - `grep -q "type: 'suggestions'" backend/src/services/streamParser.ts`
     - `grep -q "type: 'done'" backend/src/services/streamParser.ts`
+    - `grep -q "type: 'error'" backend/src/services/streamParser.ts` (Blocker 4: error variant must be present in the exported union)
+    - `grep -q "import type { ErrorCode } from '../types/copilot.js'" backend/src/services/streamParser.ts` (type-only import from Plan 03-01)
     - Parser does NOT emit `[ANOMALY` in any token text (verified in test via substring assertion)
     - Parser does NOT emit `{"suggestions"` in any token text
     - `grep -q "smoke:streamparser" backend/package.json`
     - `pnpm --filter @aperture/backend smoke:streamparser` exits 0
     - `pnpm --filter @aperture/backend typecheck` exits 0
+    - Test file contains the Test 11 compile-time fence asserting StreamParserEvent accepts an error variant: `grep -q "type: 'error'" backend/src/services/__tests__/streamParser.test.ts`
     - Test file contains at least 8 distinct numbered test cases covering: happy path, mid-tag split, mid-JSON split, multiple anomalies, malformed tag, malformed JSON, no suggestions, whitespace tolerance
     - `grep -c "Test [0-9]" backend/src/services/__tests__/streamParser.test.ts` returns at least 8
   </acceptance_criteria>
-  <done>Offline test passes, parser is chunk-boundary robust for all documented cases, npm script wired, zero new dependencies.</done>
+  <done>Offline test passes, parser is chunk-boundary robust for all documented cases, exported union includes the error variant so claudeService compiles cleanly, npm script wired, zero new runtime dependencies (ErrorCode is a type-only import).</done>
 </task>
 
 </tasks>
@@ -300,16 +343,18 @@ No HIGH threats — this is an offline, pure-function primitive.
 <verification>
 - `pnpm --filter @aperture/backend smoke:streamparser` exits 0 (offline, no env needed)
 - `pnpm --filter @aperture/backend typecheck` exits 0
-- No new dependency added to `backend/package.json`
-- Parser is consumable from `03-05 claudeService.ts` as `new StreamParser(handler)`
+- No new runtime dependency added to `backend/package.json` (ErrorCode is type-only)
+- Parser is consumable from `03-05 claudeService.ts` as `new StreamParser(handler)` AND from `03-06 chat.ts` as `write(ev.type, ev.data)` over the full union including error
 </verification>
 
 <success_criteria>
 - StreamParser class exists with `feed()` and `end()` methods
+- Exported `StreamParserEvent` union includes the `error` variant (Blocker 4 fix — unblocks claudeService type-check in Wave 2)
 - Offline test passes with all 8+ chunk-boundary cases green
+- Test file's compile-time fence (Test 11) validates the union shape at typecheck time
 - `smoke:streamparser` npm script exists and runs
 - `grep -q "[ANOMALY" backend/src/services/streamParser.ts` matches in regex definitions only, never in token-emit code paths
-- Downstream plans 03-05 and 03-06 can import StreamParser as a verified primitive
+- Downstream plans 03-05 and 03-06 can import StreamParser + StreamParserEvent as a verified primitive without casts
 </success_criteria>
 
 <output>

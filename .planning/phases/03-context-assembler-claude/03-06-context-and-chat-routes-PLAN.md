@@ -23,16 +23,17 @@ must_haves:
     - "Request body validation rejects invalid datasourceLuids (non-UUID strings, empty arrays for /chat) with 400"
     - "All-schemas-fail from assembleContext is mapped to HTTP 502 { error: 'SCHEMA_UNAVAILABLE', failedLuids, cause } per D-04"
     - "Missing ANTHROPIC_API_KEY at request time returns 503 { error: 'ENV_MISSING', key: 'ANTHROPIC_API_KEY' } on /chat (lazy check, never at boot)"
+    - "chatRoutes is exported as BOTH a default plugin (`export const chatRoutes = createChatRoutes()`) AND a factory (`createChatRoutes(opts)`) that accepts an optional ChatRouteOpts with injectable claudeDeps AND assembler for offline tests"
     - "Routes register via app.register(contextRoutes) and app.register(chatRoutes) — Phase 1/2 pattern"
   artifacts:
     - path: "backend/src/routes/context.ts"
       provides: "contextRoutes(app) — POST /context handler"
       contains: "contextRoutes"
     - path: "backend/src/routes/chat.ts"
-      provides: "chatRoutes(app) — POST /chat SSE handler with D-06 framing + D-10 heartbeat"
+      provides: "createChatRoutes(opts) factory + chatRoutes default export — POST /chat SSE handler with D-06 framing + D-10 heartbeat, accepts optional ChatRouteOpts { claudeDeps, assembler } for offline tests"
       contains: "chatRoutes"
     - path: "backend/src/services/__tests__/chatRoute.test.ts"
-      provides: "Offline tests using Fastify's inject() + a stubbed Anthropic client"
+      provides: "Offline tests using Fastify's inject() + a stubbed Anthropic client + a stubbed assembler"
       contains: "chatRoutes"
   key_links:
     - from: "backend/src/routes/chat.ts"
@@ -52,7 +53,9 @@ must_haves:
 <objective>
 Expose the Phase 3 HTTP surface for context assembly and streaming chat: `POST /context` (debug JSON endpoint) and `POST /chat` (native-SSE endpoint). Both are thin wrappers over Wave 2 primitives (contextAssembler + claudeService). This plan owns the SSE wire contract implementation (D-06 native `event:` framing, D-07 event catalog, D-10 heartbeat).
 
-Purpose: The wire contract is load-bearing for Phase 4's EventSource consumer. A single drift in event names, payload shapes, or heartbeat cadence breaks the extension. The test file uses Fastify's built-in `inject()` harness (no network) so the route can be verified offline with a stubbed Anthropic client.
+Purpose: The wire contract is load-bearing for Phase 4's EventSource consumer. A single drift in event names, payload shapes, or heartbeat cadence breaks the extension. The test file uses Fastify's built-in `inject()` harness (no network) so the route can be verified offline with a stubbed Anthropic client AND a stubbed assembler.
+
+**Route factory pattern (Warning 7 fix):** `chat.ts` exports BOTH a default plugin (`chatRoutes`) used by `server.ts` AND a factory (`createChatRoutes(opts)`) consumed by the offline test. The factory accepts `ChatRouteOpts = { claudeDeps?, assembler? }` — `claudeDeps` stubs the Anthropic SDK via Plan 03-05's existing ClaudeDeps shape; `assembler` stubs `assembleContext` so tests don't need real Tableau services. Both fields are optional and default to the real implementations.
 
 Output: Two route modules, one offline test with `inject()`, one npm script. Routes are NOT registered in server.ts yet — that happens in Plan 03-08.
 </objective>
@@ -99,7 +102,7 @@ app.post('/chat', async (req, reply) => {
 Fastify inject() for offline route testing:
 ```typescript
 const app = Fastify();
-await app.register(chatRoutes);
+await app.register(createChatRoutes({ assembler: stubAssembler, claudeDeps: { client: fakeClient } }));
 const res = await app.inject({ method: 'POST', url: '/chat', payload: {...} });
 // res.body is the full SSE response body
 ```
@@ -206,18 +209,18 @@ Do NOT register this in server.ts — Plan 03-08 owns server.ts edits.
 </task>
 
 <task type="auto">
-  <name>Task 2: Implement POST /chat SSE route with D-06 framing + D-10 heartbeat + offline inject() test</name>
+  <name>Task 2: Implement POST /chat SSE route (factory pattern with ChatRouteOpts.assembler + claudeDeps) + offline inject() test</name>
   <files>backend/src/routes/chat.ts, backend/src/services/__tests__/chatRoute.test.ts, backend/package.json</files>
   <read_first>
     - .planning/phases/03-context-assembler-claude/03-CONTEXT.md (D-06 native SSE; D-07 event catalog and payload shapes; D-10 heartbeat 15s; D-04 502 mapping)
     - backend/src/routes/context.ts (from Task 1 — copy the validateRequest pattern and LUID regex)
     - backend/src/services/claudeService.ts (from Plan 03-05 — streamChat signature + ClaudeDeps for injecting a stubbed client)
-    - backend/src/services/contextAssembler.ts (from Plan 03-04 — assembleContext signature)
-    - backend/src/types/copilot.ts (ChatMessage, DashboardState shapes)
-    - backend/src/services/streamParser.ts (from Plan 03-02 — StreamParserEvent union)
+    - backend/src/services/contextAssembler.ts (from Plan 03-04 — assembleContext signature; note the two-stage fan-out — tests mock at the assembler boundary, NOT at individual Tableau services)
+    - backend/src/types/copilot.ts (ChatMessage, DashboardState shapes, CopilotContext)
+    - backend/src/services/streamParser.ts (from Plan 03-02 — StreamParserEvent union includes all variants including error)
   </read_first>
   <action>
-Create `backend/src/routes/chat.ts`:
+Create `backend/src/routes/chat.ts`. **Note the factory pattern (Warning 7 fix):** `ChatRouteOpts` accepts BOTH `claudeDeps` (for stubbing the Anthropic SDK) AND `assembler` (for stubbing `assembleContext`). Both fields are optional and default to the real implementations. The default export `chatRoutes` is produced by calling `createChatRoutes()` with no args — that is what `server.ts` registers in Plan 03-08.
 
 ```typescript
 /**
@@ -241,6 +244,10 @@ Create `backend/src/routes/chat.ts`:
  *   event: done        { stopReason, usage, narrativeChars }
  *   event: error       { code, message }  (unrecoverable only)
  *   : ping             heartbeat every 15s
+ *
+ * Factory pattern: `createChatRoutes(opts)` accepts ChatRouteOpts with
+ * optional claudeDeps AND assembler for offline tests. The default export
+ * `chatRoutes` is `createChatRoutes()` — used by server.ts in Plan 03-08.
  */
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { assembleContext } from '../services/contextAssembler.js';
@@ -248,6 +255,7 @@ import { streamChat, type ClaudeDeps } from '../services/claudeService.js';
 import { ContextAssemblerError } from '../services/errors.js';
 import { loadEnv } from '../config/env.js';
 import type {
+  CopilotContext,
   CopilotContextRequest,
   ChatMessage,
   DashboardState,
@@ -257,8 +265,14 @@ import type {
 const LUID_REGEX = /^[a-f0-9-]{36}$/i;
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
+/**
+ * Options for `createChatRoutes`. Both fields optional; defaults use the real
+ * assembleContext + real Anthropic SDK. Tests override one or both to run
+ * fully offline.
+ */
 export interface ChatRouteOpts {
   claudeDeps?: ClaudeDeps;
+  assembler?: (req: CopilotContextRequest) => Promise<CopilotContext>;
 }
 
 interface ChatBody extends CopilotContextRequest {
@@ -295,6 +309,8 @@ function validateChatBody(body: unknown): ChatBody | { error: string } {
 }
 
 export function createChatRoutes(opts: ChatRouteOpts = {}): FastifyPluginAsync {
+  const doAssemble = opts.assembler ?? assembleContext;
+
   return async (app: FastifyInstance) => {
     app.post('/chat', async (req, reply) => {
       const validated = validateChatBody(req.body);
@@ -311,9 +327,9 @@ export function createChatRoutes(opts: ChatRouteOpts = {}): FastifyPluginAsync {
       // Assemble context first — assembler throws ContextAssemblerError on
       // all-schemas-fail (D-04), which we map to 502 BEFORE opening the SSE
       // stream so clients get a proper HTTP error response.
-      let context;
+      let context: CopilotContext;
       try {
-        context = await assembleContext({
+        context = await doAssemble({
           workbookName: validated.workbookName,
           worksheetName: validated.worksheetName,
           datasourceLuids: validated.datasourceLuids,
@@ -367,11 +383,13 @@ export function createChatRoutes(opts: ChatRouteOpts = {}): FastifyPluginAsync {
         for await (const ev of streamChat(context, validated.messages, dashboardState, validated.question, opts.claudeDeps)) {
           // Pipe StreamParserEvent → SSE frame. The parser never emits 'context'
           // (that's the route's job) so we forward every other type verbatim.
+          // StreamParserEvent is the full union (token|anomaly|suggestions|done|error)
+          // from Plan 03-02 — no type gymnastics required.
           write(ev.type, ev.data);
         }
       } catch (err) {
         const message = (err as Error)?.message ?? 'unknown';
-        write('error', { code: 'INTERNAL' as ErrorCode, message });
+        write('error', { code: 'INTERNAL' satisfies ErrorCode, message });
       } finally {
         clearInterval(heartbeat);
         reply.raw.end();
@@ -386,12 +404,13 @@ export const chatRoutes: FastifyPluginAsync = createChatRoutes();
 
 **Test file** — `backend/src/services/__tests__/chatRoute.test.ts`:
 
-Use Fastify's `inject()` for offline route testing:
+Use Fastify's `inject()` for offline route testing. The test file stubs BOTH the assembler (via `opts.assembler`) AND the Anthropic SDK (via `opts.claudeDeps.client`):
 
 ```typescript
 import Fastify from 'fastify';
 import { createChatRoutes } from '../../routes/chat.js';
 import assert from 'node:assert/strict';
+import type { CopilotContext, CopilotContextRequest } from '../../types/copilot.js';
 
 async function main(): Promise<void> {
   // Fake Anthropic client that emits a short canned stream.
@@ -402,7 +421,7 @@ async function main(): Promise<void> {
           { type: 'content_block_delta', delta: { text: 'Hello. ' } },
           { type: 'content_block_delta', delta: { text: '[ANOMALY: fieldName="X" value="Y"]' } },
           { type: 'content_block_delta', delta: { text: ' Done.\n\n{"suggestions":["a","b","c"]}' } },
-          { type: 'message_stop', message: { usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0 } } },
+          { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0 } },
         ];
         return {
           async *[Symbol.asyncIterator]() { for (const e of events) yield e; },
@@ -411,10 +430,21 @@ async function main(): Promise<void> {
     },
   };
 
-  // Monkey-patch assembleContext via a deps stub ... use dependency injection
-  // on the route or monkey-patch the module import. Simplest: export a test
-  // helper from contextAssembler that lets us inject deps globally, OR pass
-  // assembler deps through chat route opts (extend ChatRouteOpts).
+  // Stub assembler — returns a fixed CopilotContext with minimal schema.
+  const stubAssembler = async (req: CopilotContextRequest): Promise<CopilotContext> => ({
+    request: req,
+    schema: { datasources: { '11111111-2222-3333-4444-555555555555': [{ name: 'f1', caption: 'Field 1', dataType: 'STRING', description: '', upstreamLineage: [] }] } },
+    liveData: [],
+    pulse: [],
+    servicesFired: {
+      metadata: { status: 'ok', datasources: 1 },
+      vizql: { status: 'empty' },
+      pulse: { status: 'empty' },
+      assemblyMs: 42,
+      contextChars: 100,
+      truncated: false,
+    },
+  });
 
   // ... test cases:
   // Test 1: 400 on missing workbookName
@@ -422,21 +452,20 @@ async function main(): Promise<void> {
   // Test 3: 400 on empty question
   // Test 4: 400 on empty datasourceLuids
   // Test 5: 503 ENV_MISSING when env.anthropicApiKey is unset and no claudeDeps
-  // Test 6: 502 SCHEMA_UNAVAILABLE when assembler throws ContextAssemblerError
+  // Test 6: 502 SCHEMA_UNAVAILABLE when stubbed assembler throws ContextAssemblerError
   // Test 7: Happy path — Content-Type is text/event-stream
   // Test 8: Happy path — first frame is 'event: context\n'
   // Test 9: Happy path — last frame before end is 'event: done\n'
   // Test 10: Happy path — anomaly event appears in the frame stream
   // Test 11: Happy path — '[ANOMALY' substring does NOT appear in any 'event: token' frame's data payload
-  // Test 12: Happy path — '{"suggestions"' substring does NOT appear in any 'event: token' frame's data payload
+  //          (INFO 10 refinement: parse SSE frames by splitting on '\n\n', filter to frames with 'event: token', then check the data: line for substring. Robust to frame boundary splits.)
+  // Test 12: Happy path — '{"suggestions"' substring does NOT appear in any 'event: token' frame's data payload (same SSE-frame-parsed approach)
 
   process.exit(0);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
 ```
-
-**IMPORTANT:** for tests 6 and 7+, you'll need to inject a stub `assembleContext`. Extend `ChatRouteOpts` to accept an optional `assembler?: (req) => Promise<CopilotContext>` and plumb it through. Default implementation uses the real `assembleContext`. Document this extension in the plan SUMMARY.
 
 Add npm script: `"smoke:chatroute": "tsx src/services/__tests__/chatRoute.test.ts"` after `smoke:claude`.
   </action>
@@ -460,12 +489,15 @@ Add npm script: `"smoke:chatroute": "tsx src/services/__tests__/chatRoute.test.t
     - `grep -q "write('context'" backend/src/routes/chat.ts`
     - `grep -q "streamChat" backend/src/routes/chat.ts`
     - `grep -q "clearInterval(heartbeat)" backend/src/routes/chat.ts`
+    - **Warning 7 fix**: `grep -q "assembler?:" backend/src/routes/chat.ts` (ChatRouteOpts declares the assembler field)
+    - **Warning 7 fix**: `grep -q "export const chatRoutes" backend/src/routes/chat.ts` (default export still exists)
+    - **Warning 7 fix**: `grep -q "export function createChatRoutes" backend/src/routes/chat.ts` (factory is exported)
     - `grep -q "smoke:chatroute" backend/package.json`
     - `pnpm --filter @aperture/backend smoke:chatroute` exits 0
     - `pnpm --filter @aperture/backend typecheck` exits 0
     - Test file has at least 12 test cases: `grep -c "Test [0-9]" backend/src/services/__tests__/chatRoute.test.ts` returns at least 12
   </acceptance_criteria>
-  <done>/chat route assembles context, opens SSE stream with D-06 framing, emits first `context` event, pipes streamChat events, writes 15s heartbeat, closes cleanly on done/error. All offline inject() tests pass.</done>
+  <done>/chat route assembles context via injectable factory, opens SSE stream with D-06 framing, emits first `context` event, pipes streamChat events over the full StreamParserEvent union (no casts), writes 15s heartbeat, closes cleanly on done/error. All offline inject() tests pass using stubbed assembler + stubbed Anthropic SDK.</done>
 </task>
 
 </tasks>
@@ -494,7 +526,7 @@ No HIGH threats remain open after Plan 03-08 adds rate limiting.
 </threat_model>
 
 <verification>
-- `pnpm --filter @aperture/backend smoke:chatroute` exits 0 (offline, stubbed Anthropic)
+- `pnpm --filter @aperture/backend smoke:chatroute` exits 0 (offline, stubbed Anthropic + stubbed assembler)
 - `pnpm --filter @aperture/backend typecheck` exits 0
 - Routes are NOT registered in server.ts yet (Plan 03-08 owns that)
 - `grep -q "await app.register(contextRoutes)" backend/src/server.ts` returns NO matches yet
@@ -505,12 +537,14 @@ No HIGH threats remain open after Plan 03-08 adds rate limiting.
 - /chat returns SSE stream with native `event:` framing
 - First frame is always `event: context` with D-05 servicesFired payload
 - Anomaly tags from Claude are parsed and emitted as `event: anomaly` frames
-- `[ANOMALY` substring never appears in `event: token` data payloads
+- `[ANOMALY` substring never appears in `event: token` data payloads (verified by parsing SSE frames, not substring-scanning the raw wire)
 - `{"suggestions"` substring never appears in `event: token` data payloads
 - 15s heartbeat is wired via setInterval
 - All-schemas-fail → 502 SCHEMA_UNAVAILABLE (from D-04)
 - Missing API key → 503 ENV_MISSING (lazy, not at boot)
-- Offline inject() tests cover all validation paths + happy path + error path
+- `ChatRouteOpts` includes both `claudeDeps?` and `assembler?` fields (Warning 7 fix)
+- `createChatRoutes(opts)` factory and `chatRoutes` default export both exist (Warning 7 fix)
+- Offline inject() tests cover all validation paths + happy path + error path using stubbed assembler + stubbed Anthropic SDK
 </success_criteria>
 
 <output>
