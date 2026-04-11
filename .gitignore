@@ -32,3 +32,15 @@ pnpm-debug.log*
 # Coverage
 coverage/
 .nyc_output/
+
+# Tableau working files (workbooks, datasources, extracts)
+# Tableau workbooks and datasource files are working artifacts — not version controlled
+*.twb
+*.twbx
+*.twbr
+*.tds
+*.tdsx
+*.hyper
+*.backup.*.twb
+.~*.twbr
+tableau_files/
