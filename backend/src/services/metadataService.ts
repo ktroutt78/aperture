@@ -293,9 +293,11 @@ interface WorkbookMetaResponse {
 
 /**
  * GraphQL query for TAPI-02. Workbook LUID travels via the `$luid` variable.
- * The inline fragment `... on Worksheet` filters out dashboards/stories,
- * keeping `sheets` down to actual worksheets which are the only things that
- * have `upstreamDatasources`.
+ * Tableau's Metadata API exposes `Workbook.sheets` as a concrete `Sheet` type
+ * (not an interface), so the previous `... on Worksheet` fragment caused a
+ * GraphQL `UnknownType` validation error. `Sheet` itself exposes `luid`,
+ * `name`, and `upstreamDatasources` directly. Dashboards live on a separate
+ * `Workbook.dashboards` field and are intentionally not queried here.
  */
 const WORKBOOK_META_QUERY = /* GraphQL */ `
   query WorkbookMeta($luid: String!) {
@@ -303,10 +305,10 @@ const WORKBOOK_META_QUERY = /* GraphQL */ `
       luid
       name
       sheets {
-        ... on Worksheet {
-          luid
-          name
-          upstreamDatasources { luid }
+        luid
+        name
+        upstreamDatasources {
+          ... on PublishedDatasource { luid }
         }
       }
     }
