@@ -56,7 +56,7 @@
 - Pulse must degrade gracefully on empty metrics — never crash the panel. This is a shared invariant for every downstream phase.
 
 **Plans**: 5 plans
-- [ ] 02-01-PLAN.md — Shared Phase 2 typed context module (SchemaContext / LiveDataContext / PulseContext)
+- [x] 02-01-PLAN.md — Shared Phase 2 typed context module (SchemaContext / LiveDataContext / PulseContext)
 - [ ] 02-02-PLAN.md — Metadata API GraphQL service (TAPI-01, TAPI-02) + smoke test
 - [ ] 02-03-PLAN.md — VizQL Data Service with SSE-first / JSON-fallback (TAPI-03, TAPI-04, TAPI-05) + smoke test
 - [ ] 02-04-PLAN.md — Pulse REST service with graceful empty-metrics degradation (TAPI-07, TAPI-08, TAPI-09, TAPI-10) + offline unit test + live smoke
