@@ -78,7 +78,15 @@
 
 **Output contract enforced by the System Prompt Builder**: inline `[ANOMALY: fieldName="x" value="y"]` tags for the mark highlighter, trailing `{"suggestions": [...]}` for the chip UI, ≤ 3 paragraphs, references real field captions. This contract is load-bearing for Phase 4 and must not regress.
 
-**Plans**: TBD
+**Plans**: 8 plans across 4 waves
+- [ ] 03-01-PLAN.md — CopilotContext types + ServicesFired discriminated union + Phase 3 error classes
+- [ ] 03-02-PLAN.md — StreamParser class (anomaly tag + suggestions JSON state machines) + offline tests
+- [ ] 03-03-PLAN.md — SystemPromptBuilder (D-13 sections, D-14 cache marker, D-15 user-turn wrapper) + contextBudget truncator (D-17)
+- [ ] 03-04-PLAN.md — ContextAssembler (D-01 Promise.allSettled fan-out, D-02 2s/2.5s budgets, D-03 per-datasource schema, D-04 502 mapping)
+- [ ] 03-05-PLAN.md — ClaudeService (anthropic.messages.stream, model lock, 10-turn history cap, ErrorCode mapping)
+- [ ] 03-06-PLAN.md — POST /context + POST /chat SSE routes with D-06/D-07 framing + D-10 heartbeat
+- [ ] 03-07-PLAN.md — POST /export/slack + POST /export/pdf with D-20/D-21 SSRF defenses
+- [ ] 03-08-PLAN.md — @fastify/rate-limit registration (D-22) + server integration + live smoke against EIA Prices LUID
 **UI hint**: no
 
 ---
