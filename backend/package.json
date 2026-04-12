@@ -17,6 +17,7 @@
     "smoke:streamparser": "tsx src/services/__tests__/streamParser.test.ts",
     "smoke:systemprompt": "tsx src/services/__tests__/systemPromptBuilder.test.ts",
     "smoke:budget": "tsx src/services/__tests__/contextBudget.test.ts",
+    "smoke:assembler": "tsx src/services/__tests__/contextAssembler.test.ts",
     "smoke:phase2": "tsx src/services/__tests__/phase2.smoke.ts",
     "smoke:list-datasources": "tsx src/services/__tests__/listDatasources.smoke.ts",
     "smoke:exportroutes": "tsx src/services/__tests__/exportRoutes.test.ts"
