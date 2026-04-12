@@ -18,20 +18,22 @@
     "smoke:systemprompt": "tsx src/services/__tests__/systemPromptBuilder.test.ts",
     "smoke:budget": "tsx src/services/__tests__/contextBudget.test.ts",
     "smoke:assembler": "tsx src/services/__tests__/contextAssembler.test.ts",
+    "smoke:claude": "tsx src/services/__tests__/claudeService.test.ts",
     "smoke:phase2": "tsx src/services/__tests__/phase2.smoke.ts",
     "smoke:list-datasources": "tsx src/services/__tests__/listDatasources.smoke.ts",
     "smoke:exportroutes": "tsx src/services/__tests__/exportRoutes.test.ts"
   },
   "dependencies": {
-    "fastify": "^5.0.0",
+    "@anthropic-ai/sdk": "^0.40.0",
     "@fastify/cors": "^10.0.1",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.0.0",
     "pino": "^9.4.0",
-    "pino-pretty": "^11.2.2",
-    "dotenv": "^16.4.5"
+    "pino-pretty": "^11.2.2"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
+    "@types/node": "^20.14.10",
     "tsx": "^4.19.0",
-    "@types/node": "^20.14.10"
+    "typescript": "^5.5.4"
   }
 }
