@@ -185,3 +185,17 @@ export async function forceRefreshToken(): Promise<CachedToken> {
   tokenCache.clear();
   return authenticate();
 }
+
+/**
+ * Return the Tableau Cloud siteId for the currently-cached token, refreshing
+ * the token first if expired or absent. Consumers (Phase 3 PDF export route)
+ * use this to interpolate `{siteId}` into REST URLs that take the form
+ * `/api/{ver}/sites/{siteId}/...`.
+ *
+ * Reuses `getOrRefreshToken()` so the token-cache and proactive-refresh
+ * semantics from D-28 + D-30 continue to apply — no new state machine.
+ */
+export async function getCachedSiteId(): Promise<string> {
+  const token = await getOrRefreshToken();
+  return token.siteId;
+}
