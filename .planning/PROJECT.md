@@ -14,20 +14,20 @@ A Tableau user sees streamed, schema-aware narrative intelligence (with anomaly 
 
 <!-- Shipped and confirmed valuable. -->
 
-(None yet — ship to validate)
+- [x] Monorepo scaffold with Vite+React extension, TypeScript backend, and Tableau Cloud PAT auth with token caching + auto-refresh — Validated in Phase 1: Scaffold + Auth
+- [x] Metadata API service producing `SchemaContext` (fields, captions, dataTypes, descriptions, lineage) — Validated in Phase 2: Tableau API Services
+- [x] VizQL Data Service producing `LiveDataContext` (field selection, filters, max 500 rows, SSE with JSON fallback) — Validated in Phase 2: Tableau API Services
+- [x] Pulse REST API service producing `PulseContext` (metric definitions, insight bundles, `InsightFeedbackMetadata`) with graceful degradation — Validated in Phase 2: Tableau API Services
+- [x] Context Assembler merging all 3 services in parallel into a single `CopilotContext` with intelligent truncation — Validated in Phase 3: Context Assembler + Claude
+- [x] System Prompt Builder enforcing Claude output contract: field captions, anomaly tags, 3-paragraph narrative, suggestions JSON — Validated in Phase 3: Context Assembler + Claude
+- [x] Claude Service: streaming chat with conversation history, typed stream events (`token | anomaly | suggestions | done`) — Validated in Phase 3: Context Assembler + Claude
+- [x] Backend routes: `POST /context`, `POST /chat` (SSE), `POST /export/slack`, `POST /export/pdf` — Validated in Phase 3: Context Assembler + Claude
 
 ### Active
 
 <!-- Current scope. Building toward these. See REQUIREMENTS.md for detail. -->
 
-- [ ] Monorepo scaffold with Vite+React extension, TypeScript backend, and Tableau Cloud PAT auth with token caching + auto-refresh
-- [ ] Metadata API service producing `SchemaContext` (fields, captions, dataTypes, descriptions, lineage)
-- [ ] VizQL Data Service producing `LiveDataContext` (field selection, filters, max 500 rows, `interpretFieldCaptionsAsFieldNames: true`, SSE with JSON fallback)
-- [ ] Pulse REST API service producing `PulseContext` (metric definitions, insight bundles, `InsightFeedbackMetadata`) with graceful degradation
-- [ ] Context Assembler merging all 3 services in parallel into a single `CopilotContext` with 80k-token intelligent truncation
-- [ ] System Prompt Builder enforcing Claude output contract: field captions, anomaly tags, 3-paragraph narrative, suggestions JSON
-- [ ] Claude Service: streaming chat with conversation history, typed stream events (`token | anomaly | suggestions | done`)
-- [ ] Backend routes: `POST /context`, `POST /chat` (SSE), `POST /export/slack`, `POST /export/pdf`
+- [ ] Tableau Extension dashboard listener: `initializeAsync()`, listens to `MarkSelectionChanged` + `FilterChanged`, calls `/chat`, streams into panel
 - [ ] Tableau Extension dashboard listener: `initializeAsync()`, listens to `MarkSelectionChanged` + `FilterChanged`, calls `/chat`, streams into panel
 - [ ] Co-pilot panel UI: conversation thread, streamed markdown with anomaly/positive highlights, suggested question chips, `ContextBadge`, thumbs up/down, Push to Slack, Export PDF
 - [ ] Mark highlighter: parses `[ANOMALY: ...]` from the stream and fires `worksheet.selectMarksByValueAsync()` reliably (the highest-impact demo interaction)
