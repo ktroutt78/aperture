@@ -22,7 +22,8 @@
     "smoke:chatroute": "tsx src/services/__tests__/chatRoute.test.ts",
     "smoke:phase2": "tsx src/services/__tests__/phase2.smoke.ts",
     "smoke:list-datasources": "tsx src/services/__tests__/listDatasources.smoke.ts",
-    "smoke:exportroutes": "tsx src/services/__tests__/exportRoutes.test.ts"
+    "smoke:exportroutes": "tsx src/services/__tests__/exportRoutes.test.ts",
+    "smoke:phase3": "tsx src/services/__tests__/phase3.smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",

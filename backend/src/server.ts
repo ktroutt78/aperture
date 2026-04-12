@@ -48,29 +48,19 @@ async function main(): Promise<void> {
     methods: ['GET', 'POST', 'OPTIONS'],
   });
 
-  // D-22: rate limiting. Global default is permissive (1000/min) — individual
-  // routes apply tighter overrides via the onRoute hook below. /health uses
-  // the global default (no override = effectively unlimited for uptime probes).
+  // D-22: rate limiting.
   //
-  // `global: false` means the plugin does NOT auto-apply to every route; each
-  // route opts in via its own `config.rateLimit` block. Our onRoute hook sets
-  // that config programmatically based on the URL, so routes we don't touch
-  // (e.g. /health) remain unlimited. `addHeaders: { 'retry-after': true }`
-  // ensures a 429 response always carries a `Retry-After` header so clients
-  // can back off correctly — this is part of the D-22 contract.
-  await app.register(fastifyRateLimit, {
-    global: false, // opt-in per route via onRoute hook
-    max: 1000,
-    timeWindow: '1 minute',
-    skipOnError: true,
-    addHeaders: { 'retry-after': true },
-  });
-
-  // Install the onRoute hook BEFORE any route plugin is registered, so
-  // Fastify applies it to every subsequent route registration (including
-  // healthRoutes, which is moved below this line — Warning 5 fix). Because
-  // the hook runs at the top-level app scope BEFORE any `register()` call,
-  // Fastify propagates it into every child plugin's encapsulation scope.
+  // ORDER IS LOAD-BEARING: our `onRoute` hook that sets `config.rateLimit`
+  // per URL MUST be added BEFORE `app.register(fastifyRateLimit, ...)`.
+  // Fastify runs onRoute hooks in the order they were added, and
+  // @fastify/rate-limit's internal onRoute hook (which actually applies the
+  // limiter to a route) runs at the point our config is READ. If the plugin
+  // registers first, its hook runs before ours, sees no `config.rateLimit`,
+  // and skips the route — leaving it unlimited. Adding our hook first makes
+  // it run first, set the config, then the plugin's hook picks it up.
+  //
+  // This was caught by the Phase A burst test in Plan 03-08 Task 2 —
+  // inverting the order produces 61 × 200 instead of 60 × 200 + 1 × 429.
   //
   // D-22 per-URL overrides:
   //   - /chat, /context           → 60/min  (T-03-08-01 mitigation)
@@ -89,6 +79,22 @@ async function main(): Promise<void> {
     if (max !== undefined) {
       cfg.rateLimit = { max, timeWindow: '1 minute' };
     }
+  });
+
+  // Global default is permissive (1000/min) — individual routes apply tighter
+  // overrides via the onRoute hook above. /health uses the global default (no
+  // override = effectively unlimited for uptime probes). `global: false`
+  // means the plugin does NOT auto-apply to every route; each route opts in
+  // via its own `config.rateLimit` block (set by our hook above).
+  // `addHeaders: { 'retry-after': true }` ensures a 429 response always
+  // carries a `Retry-After` header so clients can back off correctly — part
+  // of the D-22 contract.
+  await app.register(fastifyRateLimit, {
+    global: false, // opt-in per route via onRoute hook
+    max: 1000,
+    timeWindow: '1 minute',
+    skipOnError: true,
+    addHeaders: { 'retry-after': true },
   });
 
   // Route registration — MUST be after the onRoute hook above so every
