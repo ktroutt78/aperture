@@ -19,6 +19,7 @@
     "smoke:budget": "tsx src/services/__tests__/contextBudget.test.ts",
     "smoke:assembler": "tsx src/services/__tests__/contextAssembler.test.ts",
     "smoke:claude": "tsx src/services/__tests__/claudeService.test.ts",
+    "smoke:chatroute": "tsx src/services/__tests__/chatRoute.test.ts",
     "smoke:phase2": "tsx src/services/__tests__/phase2.smoke.ts",
     "smoke:list-datasources": "tsx src/services/__tests__/listDatasources.smoke.ts",
     "smoke:exportroutes": "tsx src/services/__tests__/exportRoutes.test.ts"
