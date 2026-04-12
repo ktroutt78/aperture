@@ -4,9 +4,13 @@
 import './config/env.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { loadEnv } from './config/env.js';
 import { createLogger } from './lib/logger.js';
 import { healthRoutes } from './routes/health.js';
+import { contextRoutes } from './routes/context.js';
+import { chatRoutes } from './routes/chat.js';
+import { exportRoutes } from './routes/export.js';
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -44,8 +48,57 @@ async function main(): Promise<void> {
     methods: ['GET', 'POST', 'OPTIONS'],
   });
 
-  // Routes
+  // D-22: rate limiting. Global default is permissive (1000/min) — individual
+  // routes apply tighter overrides via the onRoute hook below. /health uses
+  // the global default (no override = effectively unlimited for uptime probes).
+  //
+  // `global: false` means the plugin does NOT auto-apply to every route; each
+  // route opts in via its own `config.rateLimit` block. Our onRoute hook sets
+  // that config programmatically based on the URL, so routes we don't touch
+  // (e.g. /health) remain unlimited. `addHeaders: { 'retry-after': true }`
+  // ensures a 429 response always carries a `Retry-After` header so clients
+  // can back off correctly — this is part of the D-22 contract.
+  await app.register(fastifyRateLimit, {
+    global: false, // opt-in per route via onRoute hook
+    max: 1000,
+    timeWindow: '1 minute',
+    skipOnError: true,
+    addHeaders: { 'retry-after': true },
+  });
+
+  // Install the onRoute hook BEFORE any route plugin is registered, so
+  // Fastify applies it to every subsequent route registration (including
+  // healthRoutes, which is moved below this line — Warning 5 fix). Because
+  // the hook runs at the top-level app scope BEFORE any `register()` call,
+  // Fastify propagates it into every child plugin's encapsulation scope.
+  //
+  // D-22 per-URL overrides:
+  //   - /chat, /context           → 60/min  (T-03-08-01 mitigation)
+  //   - /export/slack, /export/pdf → 10/min (T-03-08-02 mitigation)
+  //   - /health                   → no override (global default = unlimited,
+  //                                  T-03-08-03 mitigation)
+  app.addHook('onRoute', (routeOpts) => {
+    if (!routeOpts.config) routeOpts.config = {};
+    const cfg = routeOpts.config as Record<string, unknown>;
+    if (cfg.rateLimit !== undefined) return; // already set by route author
+    const url = routeOpts.url ?? '';
+    let max: number | undefined;
+    if (url === '/chat' || url === '/context') max = 60;
+    else if (url === '/export/slack' || url === '/export/pdf') max = 10;
+    // /health and any other unlisted route: no override → global default applies
+    if (max !== undefined) {
+      cfg.rateLimit = { max, timeWindow: '1 minute' };
+    }
+  });
+
+  // Route registration — MUST be after the onRoute hook above so every
+  // registered route inherits the D-22 rate-limit config via the hook.
+  // healthRoutes was previously registered at ~line 48, ABOVE the CORS
+  // block — it is MOVED here so the onRoute hook covers it (Warning 5 fix).
   await app.register(healthRoutes);
+  await app.register(contextRoutes);
+  await app.register(chatRoutes);
+  await app.register(exportRoutes);
 
   try {
     // D-15: bind to 0.0.0.0 so hosted runtimes (Docker, Render, etc.) can
